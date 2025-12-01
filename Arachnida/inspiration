@@ -1,0 +1,17 @@
+from collections import deque
+
+visited = set()
+queue = deque([start_url])
+
+while queue:
+    url = queue.popleft()
+    if url in visited:
+        continue
+    visited.add(url)
+
+    page = get_page(url)
+    images = extract_images(page)
+    save_images(images)
+
+    for link in extract_links(page):
+        queue.append(link)
