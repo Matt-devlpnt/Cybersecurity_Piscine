@@ -4,6 +4,7 @@
 # Tester une page avec uniquement du texte
 # Faire un ping pour tester les url
 # Faire attention a ce que les fichier aillent bien dans le bon dossier avec option -p
+# Gerer le ctrl+C
 
 # Standard Python
 import os
@@ -14,9 +15,10 @@ import threading
 from urllib.parse import urljoin, urlparse
 from collections import defaultdict
 
-# Standard Python
+# External library Python
 import requests
-from bs4 import BeautifulSoup
+import warnings
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
 # Globale variable
 EXTENSION_FILE = ('.jpg', '.jpeg', '.png', '.gif', '.bmp')
@@ -46,44 +48,72 @@ def parse_args():
     return parser.parse_args()
 
 
-def get_page(args):
+def unique_filepath(directory, filename):
+    base, ext = os.path.splitext(filename)
+    counter = 1
+    new_filename = filename
 
+    while os.path.exists(os.path.join(directory, new_filename)):
+        new_filename = f"{base}_{counter}{ext}"
+        counter += 1
+
+    return os.path.join(directory, new_filename)
+
+
+
+def get_page(iteration_loop_position, args, args_url, urls_to_visit):
     try:
         headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36'
         }
 
-        r = requests.get(args.URL, headers=headers, timeout=5)
-        page = BeautifulSoup(r.text, 'html.parser')
+        warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
+        r = requests.get(args_url, headers=headers, stream=True, timeout=5)
         r.raise_for_status()
 
-        return page
+        if args_url.lower().endswith(EXTENSION_FILE):
+            filename = args_url.split('/')[-1]
+            filepath = unique_filepath(args.p, filename)
+            with open(filepath, 'wb') as f:
+                for chunk in r.iter_content(1024):
+                    f.write(chunk)
+
+        elif iteration_loop_position == "first":
+            page = BeautifulSoup(r.content, 'lxml')
+
+            with lock_check_url:
+                urls_to_visit[args_url] = page
+
+        return 0
 
     except requests.Timeout:
-        print(f"[Timeout] Impossible to achieve {args.URL}")
+        print(f"[Timeout] {args_url} Impossible to achieve")
 
     except requests.TooManyRedirects:
-        print(f"[Redirect] Too many redirects for {args.URL}")
+        print(f"[Redirect] {args_url} Too many redirects")
 
     except requests.ConnectionError:
-        print(f"[Connexion] Connexion error for {args.URL}")
+        print(f"[Connexion] {args_url} Connexion error")
 
     except requests.HTTPError as http_err:
-        print(f"[HTTP {page.status_code}] {args.URL} : {http_err}")
+        print(f"[HTTP {http_err.response.status_code}] {http_err.response.url}")
 
     except requests.RequestException as e:
-        print(f"[Erreur inconnue] {args.URL} : {e}")
+        print(f"[Erreur inconnue] {args_url} : {e}")
 
+    with lock_check_url:
+        urls_to_visit[args_url] = None
     return 1
 
 
-def accessibility_page_checker(url, visited_urls):
-    try:
-        r = requests.head(url, allow_redirects=True, timeout=5)
-
-    except requests.RequestException:
-        with lock_check_url:
-            del visited_urls[url]
+#def accessibility_page_checker(url, visited_urls):
+#    try:
+#        r = requests.head(url, allow_redirects=True, timeout=5)
+#
+#    except requests.RequestException:
+#        with lock_check_url:
+#            visited_urls[url] = True
 
 
 #def images_extractor(page, base_url, images_set):
@@ -97,23 +127,108 @@ def accessibility_page_checker(url, visited_urls):
 #                        images_set.add(absolute_url)
 
 
-def url_extractor(page, base_url, visited_urls):
-    threads = []
+def url_extractor(args, base_url, page, visited_urls):
+    #threads = []
 
     for key, value in BALISE_ELEMENT.items():
         for url in page.find_all(key):
             link = url.get(value)
             if link:
                 absolute_url = urljoin(base_url,link)
-                visited_urls[absolute_url]
+                if absolute_url.startswith("http"):
+                    with lock_check_url:
+                        visited_urls[absolute_url]
 
-    for key, value in visited_urls.items():
-        t = threading.Thread(target=accessibility_page_checker, args=(key, visited_urls))
+                    #if absolute_url.lower().endswith(EXTENSION_FILE):
+                    #    filename = absolute_url.split('/')[-1]
+                    #    filepath = os.path.join(args.p, filename)
+                    #    with open(filepath, 'wb') as f:
+                    #        for chunk in r.iter_content(1024):
+                    #            f.write(chunk)
+
+
+       # with lock_check_url:
+       #     for key, value in visited_urls.items():
+       #         t = threading.Thread(target=accessibility_page_checker, args=(key, visited_urls))
+       #         threads.append(t)
+       #         t.start()
+
+    #for t in threads:
+    #    t.join()
+
+    #for key, value in visited_urls.items():
+    #    print("> " + key)
+
+
+def page_visiter(args, visited_urls):
+    urls_to_visit = {args.URL: None}
+    threads = []
+
+    recursive_number = 1
+
+    if args.r == True:
+        recursive_number += args.l
+
+    for i in range(recursive_number):
+        print(">>> " + str(i))
+        with lock_check_url:
+            temp = urls_to_visit.copy()
+        for key, value in temp.items():
+            t = threading.Thread(target=get_page, args=("first", args, key, urls_to_visit))
+            threads.append(t)
+            t.start()
+        #print(str(urls_to_visit[args.URL]))
+
+        for t in threads:
+            t.join()
+
+        threads.clear()
+        temp.clear()
+
+        for key, value in urls_to_visit.items():
+            #print(">>> " + url)
+            ##page = get_page(url)
+
+            if value is not None:
+                t = threading.Thread(target=url_extractor, args=(args, key, value, visited_urls))
+                threads.append(t)
+                t.start()
+            else:
+                visited_urls[key] = True
+
+        #print(">>> juste apres start et juste avant join")
+        for t in threads:
+            t.join()
+
+        threads.clear()
+
+        #print(">>> juste apres join")
+
+        #for key, value in visited_urls.items():
+        #    print(">>>>>>>>>>>>>>>>>>>>> " + key)
+
+        for key, value in urls_to_visit.items():
+            visited_urls[key] = True
+
+        urls_to_visit.clear()
+
+        for key, value in visited_urls.items():
+            if not value:
+                urls_to_visit[key] = None
+
+    with lock_check_url:
+        temp = urls_to_visit.copy()
+    for key, value in temp.items():
+        t = threading.Thread(target=get_page, args=("last", args, key, urls_to_visit))
         threads.append(t)
         t.start()
+    #print(str(urls_to_visit[args.URL]))
 
     for t in threads:
         t.join()
+
+    threads.clear()
+    temp.clear()
         
 
 def main():
@@ -121,8 +236,10 @@ def main():
     visited_urls = defaultdict(lambda: False)
 
     args = parse_args()
-    page = get_page(args)
-    url_extractor(page, args.URL, visited_urls)
+
+    os.makedirs(args.p, exist_ok=True)
+
+    page_visiter(args, visited_urls)
     #images_extractor(page, args.URL, images_set)
 
     print("URL:")
@@ -130,6 +247,13 @@ def main():
         print(key + " " + str(value))
 
     print("")
+
+   # for key, value in visited_urls.items():
+   #     if key.endswith(EXTENSION_FILE[0]):
+   #     elif key.endswith(EXTENSION_FILE[1]):
+   #     elif key.endswith(EXTENSION_FILE[2]):
+   #     elif key.endswith(EXTENSION_FILE[3]):
+   #     elif key.endswith(EXTENSION_FILE[4]):
 
     print("Images:")
     for key, value in import_images.items():
