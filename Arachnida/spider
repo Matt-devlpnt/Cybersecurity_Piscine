@@ -1,28 +1,64 @@
 #!/usr/bin/env python3
 
-# Roadmap
-# Tester une page avec uniquement du texte
-# Faire un ping pour tester les url
-# Faire attention a ce que les fichier aillent bien dans le bon dossier avec option -p
-# Gerer le ctrl+C
 
-# Standard Python
-import os
+###################
+# Standard Python #
+###################
+
+import os, imghdr
 import sys
 import argparse
-import time
 import threading
+import signal
 from urllib.parse import urljoin, urlparse
 from collections import defaultdict
+from pathlib import Path
 
-# External library Python
+###########################
+# External library Python #
+###########################
+
 import requests
 import warnings
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+from PIL import Image, UnidentifiedImageError
 
-# Globale variable
+####################
+# Globale variable #
+####################
+
+# Error messages colors
+BG_CTRL_C = "\033[48;5;79m"
+BG_PB = "\033[48;5;9m"
+BG_TIMEOUT = "\033[48;5;69m"
+BG_REDIRECT = "\033[48;5;192m"
+BG_CONNEXION = "\033[48;5;222m"
+BG_HTTP = "\033[48;5;141m"
+BG_UNKNOWN = "\033[48;5;214m"
+
+FG_BG_CTRL_C = "\033[1;38;5;236m"
+FG_BG_PB = "\033[1;38;5;236m"
+FG_BG_TIMEOUT = "\033[1;38;5;236m"
+FG_BG_REDIRECT = "\033[1;38;5;236m"
+FG_BG_CONNEXION = "\033[1;38;5;236m"
+FG_BG_HTTP = "\033[1;38;5;236m"
+FG_BG_UNKNOWN = "\033[1;38;5;236m"
+
+FG_CTRL_C = "\033[38;5;79m"
+FG_PB = "\033[38;5;9m"
+FG_TIMEOUT = "\033[38;5;69m"
+FG_REDIRECT = "\033[38;5;192m"
+FG_CONNEXION = "\033[38;5;222m"
+FG_HTTP = "\033[38;5;141m"
+FG_UNKNOWN = "\033[38;5;214m"
+
+RESET_COLOR = "\033[0m"
+
+
+# Files extension handled
 EXTENSION_FILE = ('.jpg', '.jpeg', '.png', '.gif', '.bmp')
 
+# html markup and properties handled
 BALISE_ELEMENT = {
     'a': 'href',
     'link': 'href',
@@ -31,10 +67,37 @@ BALISE_ELEMENT = {
     'source': 'srcset'
 }
 
+###########
+# Threads #
+###########
+
+# Mutex
 lock_check_url = threading.Lock()
+
+# Stop event handler for threads
+stop_event = threading.Event()
+
+##########
+# System #
+##########
+
+# disable ^C on terminal for ctrl+C
+os.system("stty -echoctl")
+
+###########
+# Program #
+###########
+
+def signal_handler(sig, frame):
+
+    stop_event.set()
+    print(f"{BG_CTRL_C}{FG_BG_CTRL_C}[Ctrl+C]   {RESET_COLOR}{FG_CTRL_C} JUST WAIT ENDING OF THREADS PLEASE{RESET_COLOR}")
+
+signal.signal(signal.SIGINT, signal_handler)
 
 
 def parse_args():
+
     parser = argparse.ArgumentParser(description='Spider for downloading images from a URL')
 
     parser.add_argument('URL', help='The URL of the site to scrape')
@@ -49,35 +112,69 @@ def parse_args():
 
 
 def unique_filepath(directory, filename):
+
     base, ext = os.path.splitext(filename)
     counter = 1
-    new_filename = filename
+    new_filename = f"{base[:20]}_{counter}{ext}"
 
     while os.path.exists(os.path.join(directory, new_filename)):
-        new_filename = f"{base}_{counter}{ext}"
+        new_filename = f"{base[:20]}_{counter}{ext}"
         counter += 1
 
     return os.path.join(directory, new_filename)
 
 
+def image_validator(filepath):
+
+    # 1. Vérifier existence + taille > 0
+    if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        return False
+
+    # 2. Vérifier reconnaissance du type d’image
+    if imghdr.what(filepath) is None:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        return False
+
+    # 3. Vérifier ouverture par Pillow
+    try:
+        with Image.open(filepath) as img:
+            img.verify()
+    except (UnidentifiedImageError, OSError, Exception):
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        print(f"[INFO] {filepath} removed (invalid image)")
+        return False
+
+    return True
+
 
 def get_page(iteration_loop_position, args, args_url, urls_to_visit):
+
     try:
         headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36'
         }
 
         warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-        r = requests.get(args_url, headers=headers, stream=True, timeout=5)
-        r.raise_for_status()
+        if not stop_event.is_set():
+            r = requests.get(args_url, headers=headers, stream=True, timeout=5)
+            r.raise_for_status()
+        else:
+            return 0
 
         if args_url.lower().endswith(EXTENSION_FILE):
             filename = args_url.split('/')[-1]
             filepath = unique_filepath(args.p, filename)
-            with open(filepath, 'wb') as f:
-                for chunk in r.iter_content(1024):
-                    f.write(chunk)
+            if not stop_event.is_set():
+                with open(filepath, 'wb') as f:
+                    for chunk in r.iter_content(1024):
+                        if not stop_event.is_set():
+                            f.write(chunk)
+                image_validator(filepath)
 
         elif iteration_loop_position == "first":
             page = BeautifulSoup(r.content, 'lxml')
@@ -88,47 +185,41 @@ def get_page(iteration_loop_position, args, args_url, urls_to_visit):
         return 0
 
     except requests.Timeout:
-        print(f"[Timeout] {args_url} Impossible to achieve")
+        if not stop_event.is_set():
+            print(f"{BG_TIMEOUT}{FG_BG_TIMEOUT}[Timeout]  {RESET_COLOR}{FG_TIMEOUT} {args_url}{BG_TIMEOUT} {RESET_COLOR}{FG_TIMEOUT}Impossible to achieve{RESET_COLOR}")
+        else:
+            pass
 
     except requests.TooManyRedirects:
-        print(f"[Redirect] {args_url} Too many redirects")
+        if not stop_event.is_set():
+            print(f"{BG_REDIRECT}{FG_BG_TIMEOUT}[Redirect]{RESET_COLOR}{FG_REDIRECT} {args_url}{BG_REDIRECT} {RESET_COLOR}{FG_REDIRECT}Too many redirects{RESET_COLOR}")
+        else:
+            pass
 
     except requests.ConnectionError:
-        print(f"[Connexion] {args_url} Connexion error")
+        if not stop_event.is_set():
+            print(f"{BG_CONNEXION}{FG_BG_CONNEXION}[Connexion]{RESET_COLOR}{FG_CONNEXION} {args_url}{BG_CONNEXION} {RESET_COLOR}{FG_CONNEXION}Connexion error{RESET_COLOR}")
+        else:
+            pass
 
     except requests.HTTPError as http_err:
-        print(f"[HTTP {http_err.response.status_code}] {http_err.response.url}")
+        if not stop_event.is_set():
+            print(f"{BG_HTTP}{FG_BG_HTTP}[HTTP {http_err.response.status_code}] {RESET_COLOR}{FG_HTTP} {http_err.response.url}{RESET_COLOR}")
+        else:
+            pass
 
     except requests.RequestException as e:
-        print(f"[Erreur inconnue] {args_url} : {e}")
+        if not stop_event.is_set():
+            print(f"{BG_UNKNOWN}{FG_BG_UNKNOWN}[Unknown]  {RESET_COLOR}{FG_UNKNOWN} {args_url}{BG_UNKNOWN} {RESET_COLOR}{FG_UNKNOWN}{e}{RESET_COLOR}")
+        else:
+            pass
 
     with lock_check_url:
         urls_to_visit[args_url] = None
     return 1
 
 
-#def accessibility_page_checker(url, visited_urls):
-#    try:
-#        r = requests.head(url, allow_redirects=True, timeout=5)
-#
-#    except requests.RequestException:
-#        with lock_check_url:
-#            visited_urls[url] = True
-
-
-#def images_extractor(page, base_url, images_set):
-#    for key, value in BALISE_ELEMENT.items():
-#        for url in page.find_all(key):
-#            link = url.get(value)
-#            if link:
-#                absolute_url = urljoin(base_url,link)
-#                if accessibility_page_checker(absolute_url):
-#                    if absolute_url.lower().endswith(EXTENSION_FILE):
-#                        images_set.add(absolute_url)
-
-
 def url_extractor(args, base_url, page, visited_urls):
-    #threads = []
 
     for key, value in BALISE_ELEMENT.items():
         for url in page.find_all(key):
@@ -139,28 +230,10 @@ def url_extractor(args, base_url, page, visited_urls):
                     with lock_check_url:
                         visited_urls[absolute_url]
 
-                    #if absolute_url.lower().endswith(EXTENSION_FILE):
-                    #    filename = absolute_url.split('/')[-1]
-                    #    filepath = os.path.join(args.p, filename)
-                    #    with open(filepath, 'wb') as f:
-                    #        for chunk in r.iter_content(1024):
-                    #            f.write(chunk)
 
+def page_visiter(args):
 
-       # with lock_check_url:
-       #     for key, value in visited_urls.items():
-       #         t = threading.Thread(target=accessibility_page_checker, args=(key, visited_urls))
-       #         threads.append(t)
-       #         t.start()
-
-    #for t in threads:
-    #    t.join()
-
-    #for key, value in visited_urls.items():
-    #    print("> " + key)
-
-
-def page_visiter(args, visited_urls):
+    visited_urls = defaultdict(lambda: False)
     urls_to_visit = {args.URL: None}
     threads = []
 
@@ -170,14 +243,13 @@ def page_visiter(args, visited_urls):
         recursive_number += args.l
 
     for i in range(recursive_number):
-        print(">>> " + str(i))
         with lock_check_url:
             temp = urls_to_visit.copy()
         for key, value in temp.items():
-            t = threading.Thread(target=get_page, args=("first", args, key, urls_to_visit))
-            threads.append(t)
-            t.start()
-        #print(str(urls_to_visit[args.URL]))
+            if not stop_event.is_set():
+                t = threading.Thread(target=get_page, args=("first", args, key, urls_to_visit))
+                threads.append(t)
+                t.start()
 
         for t in threads:
             t.join()
@@ -186,26 +258,18 @@ def page_visiter(args, visited_urls):
         temp.clear()
 
         for key, value in urls_to_visit.items():
-            #print(">>> " + url)
-            ##page = get_page(url)
-
             if value is not None:
-                t = threading.Thread(target=url_extractor, args=(args, key, value, visited_urls))
-                threads.append(t)
-                t.start()
+                if not stop_event.is_set():
+                    t = threading.Thread(target=url_extractor, args=(args, key, value, visited_urls))
+                    threads.append(t)
+                    t.start()
             else:
                 visited_urls[key] = True
 
-        #print(">>> juste apres start et juste avant join")
         for t in threads:
             t.join()
 
         threads.clear()
-
-        #print(">>> juste apres join")
-
-        #for key, value in visited_urls.items():
-        #    print(">>>>>>>>>>>>>>>>>>>>> " + key)
 
         for key, value in urls_to_visit.items():
             visited_urls[key] = True
@@ -219,45 +283,36 @@ def page_visiter(args, visited_urls):
     with lock_check_url:
         temp = urls_to_visit.copy()
     for key, value in temp.items():
-        t = threading.Thread(target=get_page, args=("last", args, key, urls_to_visit))
-        threads.append(t)
-        t.start()
-    #print(str(urls_to_visit[args.URL]))
+        if not stop_event.is_set():
+            t = threading.Thread(target=get_page, args=("last", args, key, urls_to_visit))
+            threads.append(t)
+            t.start()
 
     for t in threads:
         t.join()
 
     threads.clear()
     temp.clear()
+
+    if stop_event.is_set():
+        return True
         
 
 def main():
-    import_images = defaultdict(lambda: False)
-    visited_urls = defaultdict(lambda: False)
 
-    args = parse_args()
+    try:
+        args = parse_args()
 
-    os.makedirs(args.p, exist_ok=True)
+        if Path(args.p).is_dir() and not os.access(args.p, os.R_OK | os.W_OK):
+            print(f"{BG_PB}{FG_BG_PB}[ERROR]    {RESET_COLOR}{FG_PB} Directory right problem{RESET_COLOR}")
+            exit (1)
 
-    page_visiter(args, visited_urls)
-    #images_extractor(page, args.URL, images_set)
+        os.makedirs(args.p, exist_ok=True)
 
-    print("URL:")
-    for key, value in visited_urls.items():
-        print(key + " " + str(value))
+        page_visiter(args)
 
-    print("")
-
-   # for key, value in visited_urls.items():
-   #     if key.endswith(EXTENSION_FILE[0]):
-   #     elif key.endswith(EXTENSION_FILE[1]):
-   #     elif key.endswith(EXTENSION_FILE[2]):
-   #     elif key.endswith(EXTENSION_FILE[3]):
-   #     elif key.endswith(EXTENSION_FILE[4]):
-
-    print("Images:")
-    for key, value in import_images.items():
-        print(key + " " + str(value))
+    except Exception as e:
+        print(f"{BG_PB}{FG_BG_PB}[ERROR]    {RESET_COLOR}{FG_PB} {e}{RESET_COLOR}")
     
 
 if __name__ == "__main__":
