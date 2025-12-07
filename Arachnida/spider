@@ -5,7 +5,7 @@
 # Standard Python #
 ###################
 
-import os, imghdr
+import os
 import sys
 import argparse
 import threading
@@ -132,16 +132,10 @@ def image_validator(filepath):
             os.remove(filepath)
         return False
 
-    # 2. Vérifier reconnaissance du type d’image
-    if imghdr.what(filepath) is None:
-        if os.path.exists(filepath):
-            os.remove(filepath)
-        return False
-
-    # 3. Vérifier ouverture par Pillow
+    # 2. Vérifier reconnaissance réelle par Pillow
     try:
         with Image.open(filepath) as img:
-            img.verify()
+            img.verify()  # Vérifie la validité interne de l’image
     except (UnidentifiedImageError, OSError, Exception):
         if os.path.exists(filepath):
             os.remove(filepath)
@@ -216,9 +210,11 @@ def get_page(iteration_loop_position, args, args_url, urls_to_visit):
 
     with lock_check_url:
         urls_to_visit[args_url] = None
+
     return 1
 
 
+# This function extract and built absolute URL to explore
 def url_extractor(args, base_url, page, visited_urls):
 
     for key, value in BALISE_ELEMENT.items():
@@ -231,11 +227,68 @@ def url_extractor(args, base_url, page, visited_urls):
                         visited_urls[absolute_url]
 
 
+# Join and clear threads
+def thread_cleaner(threads):
+
+    for t in threads:
+        t.join()
+
+    threads.clear()
+
+
+# This function send threads for get pages and images
+def thread_handler_get_page(position, urls_to_visit, args):
+
+    threads = []
+
+    with lock_check_url:
+        temp = urls_to_visit.copy()
+    for key, value in temp.items():
+        if not stop_event.is_set():
+            t = threading.Thread(target=get_page, args=(position, args, key, urls_to_visit))
+            threads.append(t)
+            t.start()
+
+    thread_cleaner(threads)
+
+    temp.clear()
+
+
+# This function send threads for build next URLs to get
+def thread_handler_url_extractor(urls_to_visit, visited_urls, args):
+
+    threads = []
+
+    for key, value in urls_to_visit.items():
+        if value is not None:
+            if not stop_event.is_set():
+                t = threading.Thread(target=url_extractor, args=(args, key, value, visited_urls))
+                threads.append(t)
+                t.start()
+        else:
+            visited_urls[key] = True
+
+    thread_cleaner(threads)
+
+
+# This function handle next URLs to get
+def next_url_handler(urls_to_visit, visited_urls):
+
+    for key, value in urls_to_visit.items():
+        visited_urls[key] = True
+
+    urls_to_visit.clear()
+
+    for key, value in visited_urls.items():
+        if not value:
+            urls_to_visit[key] = None
+
+
+# It's the main function which handle all url with threads
 def page_visiter(args):
 
     visited_urls = defaultdict(lambda: False)
     urls_to_visit = {args.URL: None}
-    threads = []
 
     recursive_number = 1
 
@@ -243,59 +296,25 @@ def page_visiter(args):
         recursive_number += args.l
 
     for i in range(recursive_number):
-        with lock_check_url:
-            temp = urls_to_visit.copy()
-        for key, value in temp.items():
-            if not stop_event.is_set():
-                t = threading.Thread(target=get_page, args=("first", args, key, urls_to_visit))
-                threads.append(t)
-                t.start()
+        thread_handler_get_page("first", urls_to_visit, args)
 
-        for t in threads:
-            t.join()
+        thread_handler_url_extractor(urls_to_visit, visited_urls, args)
 
-        threads.clear()
-        temp.clear()
+        next_url_handler(urls_to_visit, visited_urls)
 
-        for key, value in urls_to_visit.items():
-            if value is not None:
-                if not stop_event.is_set():
-                    t = threading.Thread(target=url_extractor, args=(args, key, value, visited_urls))
-                    threads.append(t)
-                    t.start()
-            else:
-                visited_urls[key] = True
-
-        for t in threads:
-            t.join()
-
-        threads.clear()
-
-        for key, value in urls_to_visit.items():
-            visited_urls[key] = True
-
-        urls_to_visit.clear()
-
-        for key, value in visited_urls.items():
-            if not value:
-                urls_to_visit[key] = None
-
-    with lock_check_url:
-        temp = urls_to_visit.copy()
-    for key, value in temp.items():
-        if not stop_event.is_set():
-            t = threading.Thread(target=get_page, args=("last", args, key, urls_to_visit))
-            threads.append(t)
-            t.start()
-
-    for t in threads:
-        t.join()
-
-    threads.clear()
-    temp.clear()
+    thread_handler_get_page("last", urls_to_visit, args)
 
     if stop_event.is_set():
         return True
+
+
+# This function handle directory been, right and creation
+def directory_handler(args_path):
+
+    if Path(args_path).is_dir() and not os.access(args_path, os.R_OK | os.W_OK):
+        raise PermissionError(f"Directory right problem: '{args_path}'")
+
+    os.makedirs(args_path, exist_ok=True)
         
 
 def main():
@@ -303,13 +322,12 @@ def main():
     try:
         args = parse_args()
 
-        if Path(args.p).is_dir() and not os.access(args.p, os.R_OK | os.W_OK):
-            print(f"{BG_PB}{FG_BG_PB}[ERROR]    {RESET_COLOR}{FG_PB} Directory right problem{RESET_COLOR}")
-            exit (1)
-
-        os.makedirs(args.p, exist_ok=True)
+        directory_handler(args.p)
 
         page_visiter(args)
+
+    except PermissionError as e:
+        print(f"{BG_PB}{FG_BG_PB}[ERROR]    {RESET_COLOR}{FG_PB} {e}{RESET_COLOR}")
 
     except Exception as e:
         print(f"{BG_PB}{FG_BG_PB}[ERROR]    {RESET_COLOR}{FG_PB} {e}{RESET_COLOR}")
