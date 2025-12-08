@@ -29,6 +29,7 @@ from PIL import Image, UnidentifiedImageError
 
 # Error messages colors
 BG_CTRL_C = "\033[48;5;79m"
+BG_INFO = "\033[48;5;195m"
 BG_PB = "\033[48;5;9m"
 BG_TIMEOUT = "\033[48;5;69m"
 BG_REDIRECT = "\033[48;5;192m"
@@ -37,6 +38,7 @@ BG_HTTP = "\033[48;5;141m"
 BG_UNKNOWN = "\033[48;5;214m"
 
 FG_BG_CTRL_C = "\033[1;38;5;236m"
+FG_BG_INFO = "\033[1;38;5;236m"
 FG_BG_PB = "\033[1;38;5;236m"
 FG_BG_TIMEOUT = "\033[1;38;5;236m"
 FG_BG_REDIRECT = "\033[1;38;5;236m"
@@ -45,6 +47,7 @@ FG_BG_HTTP = "\033[1;38;5;236m"
 FG_BG_UNKNOWN = "\033[1;38;5;236m"
 
 FG_CTRL_C = "\033[38;5;79m"
+FG_INFO = "\033[38;5;195m"
 FG_PB = "\033[38;5;9m"
 FG_TIMEOUT = "\033[38;5;69m"
 FG_REDIRECT = "\033[38;5;192m"
@@ -56,7 +59,13 @@ RESET_COLOR = "\033[0m"
 
 
 # Files extension handled
-EXTENSION_FILE = ('.jpg', '.jpeg', '.png', '.gif', '.bmp')
+EXTENSION_FILE = (
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.bmp'
+)
 
 # html markup and properties handled
 BALISE_ELEMENT = {
@@ -88,6 +97,7 @@ os.system("stty -echoctl")
 # Program #
 ###########
 
+# This function handle ctrl+C signal
 def signal_handler(sig, frame):
 
     stop_event.set()
@@ -96,6 +106,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 
+# This function handle starting parsing
 def parse_args():
 
     parser = argparse.ArgumentParser(description='Spider for downloading images from a URL')
@@ -111,6 +122,7 @@ def parse_args():
     return parser.parse_args()
 
 
+# This function check if the image get unique name
 def unique_filepath(directory, filename):
 
     base, ext = os.path.splitext(filename)
@@ -124,27 +136,50 @@ def unique_filepath(directory, filename):
     return os.path.join(directory, new_filename)
 
 
+#This function check if image file exist and if image is a real image
 def image_validator(filepath):
 
-    # 1. Vérifier existence + taille > 0
     if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
         if os.path.exists(filepath):
             os.remove(filepath)
         return False
 
-    # 2. Vérifier reconnaissance réelle par Pillow
     try:
         with Image.open(filepath) as img:
-            img.verify()  # Vérifie la validité interne de l’image
+            img.verify()
     except (UnidentifiedImageError, OSError, Exception):
         if os.path.exists(filepath):
             os.remove(filepath)
-        print(f"[INFO] {filepath} removed (invalid image)")
+        print(f"{BG_INFO}{FG_BG_INFO}[INFO]     {RESET_COLOR}{FG_INFO} {filepath} removed (invalid image){RESET_COLOR}")
         return False
 
     return True
 
 
+# This function makes two action, write images or stock address for next time
+def get_page_actions(req, iteration_loop_position, args, args_url, urls_to_visit):
+    if args_url.lower().endswith(EXTENSION_FILE):
+        filename = args_url.split('/')[-1]
+        filepath = unique_filepath(args.p, filename)
+        if not stop_event.is_set():
+            with open(filepath, 'wb') as f:
+                for chunk in req.iter_content(1024):
+                    if not stop_event.is_set():
+                        f.write(chunk)
+            image_validator(filepath)
+
+    elif iteration_loop_position == "first":
+        page = BeautifulSoup(req.content, 'lxml')
+
+        with lock_check_url:
+            urls_to_visit[args_url] = page
+
+
+# This function concern a thread, get request and load images if URL target an image
+# First, there is a header to simulate a real browser
+# The warning handle line is here to manage error due to xml parsing
+# After there is the get request part and check error
+# After there is image load part or stocking address for the next time
 def get_page(iteration_loop_position, args, args_url, urls_to_visit):
 
     try:
@@ -160,21 +195,7 @@ def get_page(iteration_loop_position, args, args_url, urls_to_visit):
         else:
             return 0
 
-        if args_url.lower().endswith(EXTENSION_FILE):
-            filename = args_url.split('/')[-1]
-            filepath = unique_filepath(args.p, filename)
-            if not stop_event.is_set():
-                with open(filepath, 'wb') as f:
-                    for chunk in r.iter_content(1024):
-                        if not stop_event.is_set():
-                            f.write(chunk)
-                image_validator(filepath)
-
-        elif iteration_loop_position == "first":
-            page = BeautifulSoup(r.content, 'lxml')
-
-            with lock_check_url:
-                urls_to_visit[args_url] = page
+        get_page_actions(r, iteration_loop_position, args, args_url, urls_to_visit)
 
         return 0
 
@@ -214,7 +235,7 @@ def get_page(iteration_loop_position, args, args_url, urls_to_visit):
     return 1
 
 
-# This function extract and built absolute URL to explore
+# This function concern a thread, extract and built absolute URL to explore
 def url_extractor(args, base_url, page, visited_urls):
 
     for key, value in BALISE_ELEMENT.items():
