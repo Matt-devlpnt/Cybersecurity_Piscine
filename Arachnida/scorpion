@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+
+
+##########
+# Import #
+##########
+
+import os
+import sys
+import argparse
+from pathlib import Path
+from PIL import Image, ExifTags
+
+####################
+# Globale variable #
+####################
+
+BG_FILE_NAME = "\033[48;5;79m"
+BG_SUBITEM = "\033[48;5;141m"
+BG_PB = "\033[48;5;9m"
+
+FG_BG_FILE_NAME = "\033[1;38;5;236m"
+FG_BG_SUBITEM = "\033[1;38;5;236m"
+FG_BG_PB = "\033[1;38;5;236m"
+
+FG_FILE_NAME = "\033[38;5;79m"
+FG_SUBITEM = "\033[38;5;141m"
+FG_PB = "\033[38;5;9m"
+
+RESET_COLOR = "\033[0m"
+
+
+###########
+# Program #
+###########
+
+# This function handle starting parsing
+def parse_args():
+
+    parser = argparse.ArgumentParser(description='Scorpion show EXIF and other metadata of images')
+
+    parser.add_argument('File', nargs='+', help='File for metadata')
+
+    return parser.parse_args()
+
+
+# This function handle directory been, right and creation
+def file_handler(args_path):
+
+    if not Path(args_path).is_file():
+        raise PermissionError(f"Directory right problem: '{args_path}'")
+
+
+# This function print image attributes
+def image_attributes_printer(img):
+
+    exif = None
+
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}\n{FG_FILE_NAME}|{BG_SUBITEM}{FG_BG_SUBITEM}IMAGE ATTRIBUTES{RESET_COLOR}")
+
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Filename:{RESET_COLOR} {img.filename}")
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Format:{RESET_COLOR} {img.format}")
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Width:{RESET_COLOR} {img.width} px")
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Height:{RESET_COLOR} {img.height} px")
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Mode:{RESET_COLOR} {img.mode}")
+
+    dic = img.info
+    for k, v in dic.items():
+        if k == 'exif':
+            exif = img.getexif()
+        else:
+            print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}{k}:{RESET_COLOR} {v}")
+
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Animated:{RESET_COLOR} {getattr(img, "is_animated", False)}")
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Number of frames:{RESET_COLOR} {getattr(img, "n_frames", 0)}")
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Transparency data:{RESET_COLOR} {img.has_transparency_data}")
+
+    return exif
+
+
+# This function print image exif
+def exif_printer(exif):
+
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}\n{FG_FILE_NAME}|{RESET_COLOR}{BG_SUBITEM}{FG_BG_SUBITEM}EXIF{RESET_COLOR}")
+    for k, v in exif.items():
+        tag_name = ExifTags.TAGS.get(k, f"Unknown({k})")
+        print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}{tag_name}:{RESET_COLOR} {v}")
+    exif.clear()
+
+
+def main():
+
+    try:
+        args = parse_args()
+
+        for file in args.File:
+
+            file_handler(file)
+
+            with Image.open(file) as img:
+                print()
+                print(f"{BG_FILE_NAME} {BG_FILE_NAME}{FG_BG_FILE_NAME}{file}{RESET_COLOR}")
+
+                exif = image_attributes_printer(img)
+
+                if exif:
+                    exif_printer(exif)
+
+                print()
+
+    except Exception as e:
+        print(f"{BG_PB}{FG_BG_PB}[ERROR]{RESET_COLOR}{FG_PB} {e}{RESET_COLOR}")
+
+
+if __name__ == "__main__":
+    main()
