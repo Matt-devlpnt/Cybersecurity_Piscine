@@ -95,7 +95,11 @@ def main():
 
         for file in args.File:
 
-            file_handler(file)
+            try:
+                file_handler(file)
+            except Exception as e:
+                print(f"{BG_PB}{FG_BG_PB}[ERROR]{RESET_COLOR}{FG_PB} {e}{RESET_COLOR}")
+                continue
 
             with Image.open(file) as img:
                 print()
