@@ -71,8 +71,8 @@ def image_attributes_printer(img):
         else:
             print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}{k}:{RESET_COLOR} {v}")
 
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Animated:{RESET_COLOR} {getattr(img, "is_animated", False)}")
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Number of frames:{RESET_COLOR} {getattr(img, "n_frames", 0)}")
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Animated:{RESET_COLOR} {getattr(img, 'is_animated', False)}")
+    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Number of frames:{RESET_COLOR} {getattr(img, 'n_frames', 0)}")
     print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Transparency data:{RESET_COLOR} {img.has_transparency_data}")
 
     return exif
