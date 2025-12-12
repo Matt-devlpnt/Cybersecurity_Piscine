@@ -8,11 +8,19 @@
 import os
 import sys
 import argparse
+import base64
+import json
+import getpass
+from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
 
 
 ####################
 # Globale variable #
 ####################
+
+FILE_KEY="ft_otp.key"
 
 
 ###########
@@ -50,13 +58,68 @@ def parse_args():
     return parser.parse_args()
 
 
+def derive_key(salt):
+
+    kdf = Argon2id(
+        salt=salt,
+        length=32,
+        iterations=1,
+        lanes=4,
+        memory_cost=64 * 1024,
+        ad=None,
+        secret=None,
+    )
+    return kdf.derive(getpass.getpass("Mot de passe : ").encode("utf-8"))
+
+
+def encrypt_secret(secret_hex):
+    # 1) Convertir clé TOTP hex → bytes
+    secret_bytes = bytes.fromhex(secret_hex)
+
+    # 2) Générer salt et iv
+    salt = os.urandom(16)
+    iv = os.urandom(16)
+
+    # 3) Dériver clé AES depuis le mot de passe
+    key = derive_key(salt)
+
+    # 4) Préparer AES-CBC
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+
+    # 5) Padding PKCS#7
+    padder = padding.PKCS7(32).padder()
+    padded = padder.update(secret_bytes)
+    padded += padder.finalize()
+
+    # 6) Chiffrer
+    encrypted = encryptor.update(padded) + encryptor.finalize()
+
+    # 7) Retourner tout ce qu’il faut stocker
+    return salt, iv, encrypted
+
+
+def generate_keyfile(secret_hex):
+
+    salt, iv, encrypted = encrypt_secret(secret_hex)
+
+    data = {
+        "salt": base64.b64encode(salt).decode(),
+        "iv": base64.b64encode(iv).decode(),
+        "data": base64.b64encode(encrypted).decode(),
+    }
+
+    with open(FILE_KEY, "w") as f:
+        json.dump(data, f, indent="\t", sort_keys=True)
+
+
 def main():
 
     args = parse_args()
 
     key = valid_key(args.g)
 
-    print(key)
+    generate_keyfile(key)
 
 
 if __name__ == "__main__":
