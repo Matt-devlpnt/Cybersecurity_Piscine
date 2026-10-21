@@ -1,125 +1,188 @@
 #!/usr/bin/env python3
 
-
 ##########
 # Import #
 ##########
 
 import os
 import sys
+import logging
 import argparse
+import binascii
 import base64
 import json
+import time
+import hmac
+import hashlib
+import struct
 import getpass
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
 
-
 ####################
 # Globale variable #
 ####################
 
-FILE_KEY="ft_otp.key"
-
+FILE_KEY = "ft_otp.key"
+TIME_STEP = 30          # Standard TOTP window (30 seconds)
+DIGITS = 6              # 6-digit OTP
 
 ###########
 # Program #
 ###########
 
-def valid_key(key):
+def parse_args():
+    parser = argparse.ArgumentParser(description="ft_otp - Time-based One-Time Password generator")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-g', metavar='KEY', help="Store a hexadecimal key (≥ 64 chars) encrypted in ft_otp.key")
+    group.add_argument('-k', metavar='KEYFILE', help="Generate a temporary password from the encrypted key file")
+    return parser.parse_args()
 
-    try:
-        file = open(key, 'rt')
-        if file.readable():
-            file_content = file.read()
-            key = file_content
-    except:
-        pass
+
+def validate_hex_key(key: str) -> str:
+    """Validate and return a clean hexadecimal key (≥ 64 characters)."""
+    # If it's a file path, read it
+    if os.path.isfile(key):
+        with open(key, 'r') as f:
+            key = f.read().strip()
+
+    key = key.strip().lower()
 
     if len(key) < 64:
-        print("Please for -g arg give a hexadecimal key of at least 64 characters")
-        exit(1)
+        print("Error: key must be at least 64 hexadecimal characters.", file=sys.stderr)
+        sys.exit(1)
 
-    if not set(key).issubset(set('abcdefABCDEF0123456789')):
-        print("Please for -g arg give a hexadecimal key | charset : A-F and 0-9")
-        exit(1)
+    if not all(c in "0123456789abcdef" for c in key):
+        print("Error: key must contain only hexadecimal characters (0-9, a-f).", file=sys.stderr)
+        sys.exit(1)
 
     return key
 
 
-def parse_args():
-
-    parser = argparse.ArgumentParser(description='ft_otp is a password generator')
-
-    parser.add_argument('-g', help='Hexadecimal key of at least 64 characters')
-    parser.add_argument('-k', help='Generates a new temporary password based on the key given as argument')
-
-    return parser.parse_args()
-
-
-def derive_key(salt):
-
+def derive_key(password: bytes, salt: bytes) -> bytes:
+    """Derive a 32-byte AES key from password using Argon2id."""
     kdf = Argon2id(
         salt=salt,
         length=32,
-        iterations=1,
+        iterations=3,
         lanes=4,
         memory_cost=64 * 1024,
-        ad=None,
-        secret=None,
     )
-    return kdf.derive(getpass.getpass("Mot de passe : ").encode("utf-8"))
+    return kdf.derive(password)
 
 
-def encrypt_secret(secret_hex):
-    # 1) Convertir clé TOTP hex → bytes
+def encrypt_and_save(secret_hex: str):
+    """Encrypt the TOTP secret and save it to ft_otp.key."""
     secret_bytes = bytes.fromhex(secret_hex)
 
-    # 2) Générer salt et iv
     salt = os.urandom(16)
     iv = os.urandom(16)
 
-    # 3) Dériver clé AES depuis le mot de passe
-    key = derive_key(salt)
+    password = getpass.getpass("Encryption password: ").encode()
+    key = derive_key(password, salt)
 
-    # 4) Préparer AES-CBC
+    # AES-CBC with PKCS7 padding
+    padder = padding.PKCS7(128).padder()
+    padded_data = padder.update(secret_bytes) + padder.finalize()
+
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
     encryptor = cipher.encryptor()
-
-    # 5) Padding PKCS#7
-    padder = padding.PKCS7(32).padder()
-    padded = padder.update(secret_bytes)
-    padded += padder.finalize()
-
-    # 6) Chiffrer
-    encrypted = encryptor.update(padded) + encryptor.finalize()
-
-    # 7) Retourner tout ce qu’il faut stocker
-    return salt, iv, encrypted
-
-
-def generate_keyfile(secret_hex):
-
-    salt, iv, encrypted = encrypt_secret(secret_hex)
+    encrypted = encryptor.update(padded_data) + encryptor.finalize()
 
     data = {
         "salt": base64.b64encode(salt).decode(),
-        "iv": base64.b64encode(iv).decode(),
+        "iv":   base64.b64encode(iv).decode(),
         "data": base64.b64encode(encrypted).decode(),
     }
 
     with open(FILE_KEY, "w") as f:
-        json.dump(data, f, indent="\t", sort_keys=True)
+        json.dump(data, f, indent=4)
+
+    print(f"Key was successfully saved in {FILE_KEY}.")
+
+
+def decrypt_key(keyfile: str) -> bytes:
+    """Decrypt and return the raw TOTP secret bytes."""
+    if not os.path.isfile(keyfile):
+        print(f"Error: file '{keyfile}' not found.", file=sys.stderr)
+        sys.exit(1)
+
+    with open(keyfile, "r") as f:
+        data = json.load(f)
+
+    salt = base64.b64decode(data["salt"])
+    iv   = base64.b64decode(data["iv"])
+    encrypted = base64.b64decode(data["data"])
+
+    password = getpass.getpass("Encryption password: ").encode()
+    key = derive_key(password, salt)
+
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    decryptor = cipher.decryptor()
+    padded = decryptor.update(encrypted) + decryptor.finalize()
+
+    unpadder = padding.PKCS7(128).unpadder()
+    secret = unpadder.update(padded) + unpadder.finalize()
+    return secret
+
+
+def hotp(secret: bytes, counter: int, digits: int) -> str:
+    """
+    Generate an HOTP value according to RFC 4226.
+    """
+    # 8-byte big-endian counter
+    counter_bytes = struct.pack(">Q", counter)
+
+    # HMAC-SHA1
+    hmac_hash = hmac.new(secret, counter_bytes, hashlib.sha1).digest()
+
+    # Dynamic truncation
+    offset = hmac_hash[-1] & 0x0F
+    code = struct.unpack(">I", hmac_hash[offset:offset+4])[0] & 0x7FFFFFFF
+
+    otp = code % (10 ** digits)
+    return str(otp).zfill(digits)
+
+
+def totp(secret: bytes, digits: int, time_step: int) -> str:
+    """
+    Generate a TOTP value according to RFC 6238.
+    """
+    counter = int(time.time()) // time_step
+    return hotp(secret, counter, digits)
 
 
 def main():
+    try:
+        args = parse_args()
+    
+        if args.g:
+            secret_hex = validate_hex_key(args.g)
+            encrypt_and_save(secret_hex)
+    
+        elif args.k:
+            secret = decrypt_key(args.k)
+            password = totp(secret, DIGITS, TIME_STEP)
+            print(password)
 
-    args = parse_args()
-
-    key = valid_key(args.g)
-
-    generate_keyfile(key)
+    except json.decoder.JSONDecodeError:
+        logging.error("The file is not in JSON format")
+        sys.exit(1)
+    except KeyError as e:
+        logging.error(f"Error with the {e} key in the ft_otp.key file")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print()
+        logging.error("Keyboard interrupt")
+        sys.exit(1)
+    except EOFError:
+        print()
+        logging.error("End Of File")
+        sys.exit(1)
+    except binascii.Error as e:
+        logging.error(e)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

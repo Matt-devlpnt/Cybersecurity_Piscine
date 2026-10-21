@@ -1,120 +1,77 @@
 #!/usr/bin/env python3
 
-
 ##########
 # Import #
 ##########
-
-import os
-import sys
 import argparse
 from pathlib import Path
-from PIL import Image, ExifTags
+from PIL import Image, ExifTags, UnidentifiedImageError
 
 ####################
 # Globale variable #
 ####################
-
-BG_FILE_NAME = "\033[48;5;79m"
-BG_SUBITEM = "\033[48;5;141m"
-BG_PB = "\033[48;5;9m"
-
-FG_BG_FILE_NAME = "\033[1;38;5;236m"
-FG_BG_SUBITEM = "\033[1;38;5;236m"
-FG_BG_PB = "\033[1;38;5;236m"
-
-FG_FILE_NAME = "\033[38;5;79m"
-FG_SUBITEM = "\033[38;5;141m"
-FG_PB = "\033[38;5;9m"
-
-RESET_COLOR = "\033[0m"
-
+BG_FILE = "\033[48;5;79m"
+BG_SUB  = "\033[48;5;141m"
+BG_ERR  = "\033[48;5;9m"
+FG_BG   = "\033[1;38;5;236m"
+FG_FILE = "\033[38;5;79m"
+FG_SUB  = "\033[38;5;141m"
+FG_ERR  = "\033[38;5;9m"
+RESET   = "\033[0m"
 
 ###########
 # Program #
 ###########
-
-# This function handle starting parsing
-def parse_args():
-
-    parser = argparse.ArgumentParser(description='Scorpion show EXIF and other metadata of images')
-
-    parser.add_argument('File', nargs='+', help='File for metadata')
-
-    return parser.parse_args()
-
-
-# This function handle directory been, right and creation
-def file_handler(args_path):
-
-    if not Path(args_path).is_file():
-        raise PermissionError(f"Directory right problem: '{args_path}'")
-
-
-# This function print image attributes
-def image_attributes_printer(img):
-
-    exif = None
-
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}\n{FG_FILE_NAME}|{BG_SUBITEM}{FG_BG_SUBITEM}IMAGE ATTRIBUTES{RESET_COLOR}")
-
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Filename:{RESET_COLOR} {img.filename}")
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Format:{RESET_COLOR} {img.format}")
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Width:{RESET_COLOR} {img.width} px")
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Height:{RESET_COLOR} {img.height} px")
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Mode:{RESET_COLOR} {img.mode}")
-
-    dic = img.info
-    for k, v in dic.items():
-        if k == 'exif':
-            exif = img.getexif()
-        else:
-            print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}{k}:{RESET_COLOR} {v}")
-
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Animated:{RESET_COLOR} {getattr(img, 'is_animated', False)}")
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Number of frames:{RESET_COLOR} {getattr(img, 'n_frames', 0)}")
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}Transparency data:{RESET_COLOR} {img.has_transparency_data}")
-
-    return exif
-
-
-# This function print image exif
-def exif_printer(exif):
-
-    print(f"{FG_FILE_NAME}|{RESET_COLOR}\n{FG_FILE_NAME}|{RESET_COLOR}{BG_SUBITEM}{FG_BG_SUBITEM}EXIF{RESET_COLOR}")
-    for k, v in exif.items():
-        tag_name = ExifTags.TAGS.get(k, f"Unknown({k})")
-        print(f"{FG_FILE_NAME}|{RESET_COLOR}{FG_SUBITEM}{tag_name}:{RESET_COLOR} {v}")
-    exif.clear()
-
-
-def main():
+def show_metadata(path: str):
+    p = Path(path)
+    if not p.is_file():
+        print(f"{BG_ERR}{FG_BG}[ERROR]{RESET}{FG_ERR} File not found: {path}{RESET}")
+        return
 
     try:
-        args = parse_args()
+        with Image.open(p) as img:
+            print(f"\n{BG_FILE}{FG_BG} {p.name} {RESET}")
+            print(f"{FG_FILE}|{RESET}")
+            print(f"{FG_FILE}|{BG_SUB}{FG_BG} IMAGE ATTRIBUTES {RESET}")
+            print(f"{FG_FILE}|{RESET}{FG_SUB} Path        :{RESET} {p.resolve()}")
+            print(f"{FG_FILE}|{RESET}{FG_SUB} Format      :{RESET} {img.format}")
+            print(f"{FG_FILE}|{RESET}{FG_SUB} Size        :{RESET} {img.width} × {img.height} px")
+            print(f"{FG_FILE}|{RESET}{FG_SUB} Mode        :{RESET} {img.mode}")
+            print(f"{FG_FILE}|{RESET}{FG_SUB} Animated    :{RESET} {getattr(img, 'is_animated', False)}")
+            print(f"{FG_FILE}|{RESET}{FG_SUB} Frames      :{RESET} {getattr(img, 'n_frames', 1)}")
 
-        for file in args.File:
+            # Additional info (dpi, icc, etc.)
+            for k, v in img.info.items():
+                if k.lower() != 'exif':
+                    print(f"{FG_FILE}|{RESET}{FG_SUB} {k:12}:{RESET} {v}")
 
-            try:
-                file_handler(file)
-            except Exception as e:
-                print(f"{BG_PB}{FG_BG_PB}[ERROR]{RESET_COLOR}{FG_PB} {e}{RESET_COLOR}")
-                continue
+            # EXIF
+            exif = img.getexif()
+            if exif:
+                print(f"{FG_FILE}|{RESET}")
+                print(f"{FG_FILE}|{BG_SUB}{FG_BG} EXIF {RESET}")
+                for tag_id, value in exif.items():
+                    name = ExifTags.TAGS.get(tag_id, f"Unknown({tag_id})")
+                    print(f"{FG_FILE}|{RESET}{FG_SUB} {name:20}:{RESET} {value}")
+            else:
+                print(f"{FG_FILE}|{RESET}{FG_SUB} (no EXIF data){RESET}")
+            print()
 
-            with Image.open(file) as img:
-                print()
-                print(f"{BG_FILE_NAME} {BG_FILE_NAME}{FG_BG_FILE_NAME}{file}{RESET_COLOR}")
-
-                exif = image_attributes_printer(img)
-
-                if exif:
-                    exif_printer(exif)
-
-                print()
-
+    except UnidentifiedImageError:
+        print(f"{BG_ERR}{FG_BG}[ERROR]{RESET}{FG_ERR} {path} is not a supported image{RESET}")
     except Exception as e:
-        print(f"{BG_PB}{FG_BG_PB}[ERROR]{RESET_COLOR}{FG_PB} {e}{RESET_COLOR}")
+        print(f"{BG_ERR}{FG_BG}[ERROR]{RESET}{FG_ERR} {path} → {e}{RESET}")
 
+def main():
+    parser = argparse.ArgumentParser(description="Scorpion - display image metadata")
+    parser.add_argument('files', nargs='+', help="Image file(s)")
+    # Ready for bonus:
+    # parser.add_argument('--remove-exif', action='store_true', help="Remove EXIF metadata")
+    # parser.add_argument('--set', nargs=2, metavar=('TAG', 'VALUE'), help="Modify a tag")
+    args = parser.parse_args()
+
+    for f in args.files:
+        show_metadata(f)
 
 if __name__ == "__main__":
     main()

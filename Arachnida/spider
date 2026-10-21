@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
-
 ##########
 # Import #
 ##########
-
 import os
 import sys
 import argparse
@@ -19,335 +17,239 @@ from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from PIL import Image, UnidentifiedImageError
 
 ####################
-# Globale variable #
+# Global variables #
 ####################
-
-# Error messages colors
-BG_CTRL_C = "\033[48;5;79m"
-BG_INFO = "\033[48;5;195m"
-BG_PB = "\033[48;5;9m"
-BG_TIMEOUT = "\033[48;5;69m"
-BG_REDIRECT = "\033[48;5;192m"
+# Colors
+BG_CTRL_C    = "\033[48;5;79m"
+BG_INFO      = "\033[48;5;195m"
+BG_PB        = "\033[48;5;9m"
+BG_TIMEOUT   = "\033[48;5;69m"
+BG_REDIRECT  = "\033[48;5;192m"
 BG_CONNEXION = "\033[48;5;222m"
-BG_HTTP = "\033[48;5;141m"
-BG_UNKNOWN = "\033[48;5;214m"
-
-FG_BG_CTRL_C = "\033[1;38;5;236m"
-FG_BG_INFO = "\033[1;38;5;236m"
-FG_BG_PB = "\033[1;38;5;236m"
-FG_BG_TIMEOUT = "\033[1;38;5;236m"
-FG_BG_REDIRECT = "\033[1;38;5;236m"
-FG_BG_CONNEXION = "\033[1;38;5;236m"
-FG_BG_HTTP = "\033[1;38;5;236m"
-FG_BG_UNKNOWN = "\033[1;38;5;236m"
-
-FG_CTRL_C = "\033[38;5;79m"
-FG_INFO = "\033[38;5;195m"
-FG_PB = "\033[38;5;9m"
-FG_TIMEOUT = "\033[38;5;69m"
-FG_REDIRECT = "\033[38;5;192m"
+BG_HTTP      = "\033[48;5;141m"
+BG_UNKNOWN   = "\033[48;5;214m"
+FG_BG        = "\033[1;38;5;236m"
+FG_CTRL_C    = "\033[38;5;79m"
+FG_INFO      = "\033[38;5;195m"
+FG_PB        = "\033[38;5;9m"
+FG_TIMEOUT   = "\033[38;5;69m"
+FG_REDIRECT  = "\033[38;5;192m"
 FG_CONNEXION = "\033[38;5;222m"
-FG_HTTP = "\033[38;5;141m"
-FG_UNKNOWN = "\033[38;5;214m"
+FG_HTTP      = "\033[38;5;141m"
+FG_UNKNOWN   = "\033[38;5;214m"
+RESET        = "\033[0m"
 
-RESET_COLOR = "\033[0m"
+# Supported file extensions
+EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.bmp')
 
-
-# Files extension handled
-EXTENSION_FILE = (
-    '.jpg',
-    '.jpeg',
-    '.png',
-    '.gif',
-    '.bmp'
-)
-
-# html markup and properties handled
-BALISE_ELEMENT = {
+# HTML tags and attributes to parse
+TAGS = {
     'a': 'href',
     'link': 'href',
     'iframe': 'src',
     'img': 'src',
-    'source': 'srcset'
+    'source': 'srcset',
+    'embed': 'src',
+    'object': 'data',
 }
 
 ###########
 # Threads #
 ###########
-
 # Mutex
-lock_check_url = threading.Lock()
-
-# Stop event handler for threads
+lock = threading.Lock()
+# Stop event for threads
 stop_event = threading.Event()
 
 ##########
 # System #
 ##########
-
-# disable ^C on terminal for ctrl+C
+# Hide ^C in terminal
 os.system("stty -echoctl")
 
 ###########
 # Program #
 ###########
-
-# This function handle ctrl+C signal
 def signal_handler(sig, frame):
-
     stop_event.set()
-    print(f"{BG_CTRL_C}{FG_BG_CTRL_C}[Ctrl+C]   {RESET_COLOR}{FG_CTRL_C} JUST WAIT ENDING OF THREADS PLEASE{RESET_COLOR}")
+    print(f"{BG_CTRL_C}{FG_BG}[Ctrl+C]{RESET}{FG_CTRL_C} Stopping threads...{RESET}")
 
 signal.signal(signal.SIGINT, signal_handler)
 
 
-# This function handle starting parsing
-def parse_args():
-
-    parser = argparse.ArgumentParser(description='Spider for downloading images from a URL')
-
-    parser.add_argument('URL', help='The URL of the site to scrape')
-    parser.add_argument('-r', action='store_true', \
-        help='Recursively downloads the images in a URL received as a parameter.')
-    parser.add_argument('-l', metavar='[N]', type=int, default=5, \
-        help='Indicates the maximum depth level of the recursive download. If not indicated, it will be 5.')
-    parser.add_argument('-p', metavar='[PATH]', default='./data/', \
-        help='Indicates the path where the downloaded files will be saved. If not specified, ./data/ will be used.')
-
-    return parser.parse_args()
-
-
-# This function check if the image get unique name
-def unique_filepath(directory, filename):
-
+def unique_filepath(directory: str, filename: str) -> str:
+    """Return a unique filepath, keeping the original name if possible."""
+    path = os.path.join(directory, filename)
+    if not os.path.exists(path):
+        return path
     base, ext = os.path.splitext(filename)
     counter = 1
-    new_filename = f"{base[:20]}_{counter}{ext}"
-
-    while os.path.exists(os.path.join(directory, new_filename)):
-        new_filename = f"{base[:20]}_{counter}{ext}"
+    while True:
+        candidate = os.path.join(directory, f"{base}_{counter}{ext}")
+        if not os.path.exists(candidate):
+            return candidate
         counter += 1
 
-    return os.path.join(directory, new_filename)
+
+def is_image_url(url: str) -> bool:
+    return urlparse(url).path.lower().endswith(EXTENSIONS)
 
 
-#This function check if image file exist and if image is a real image
-def image_validator(filepath):
-
+def image_validator(filepath: str) -> bool:
     if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
         if os.path.exists(filepath):
             os.remove(filepath)
         return False
-
     try:
         with Image.open(filepath) as img:
             img.verify()
-    except (UnidentifiedImageError, OSError, Exception):
+        return True
+    except Exception:
         if os.path.exists(filepath):
             os.remove(filepath)
-        print(f"{BG_INFO}{FG_BG_INFO}[INFO]     {RESET_COLOR}{FG_INFO} {filepath} removed (invalid image){RESET_COLOR}")
+        print(f"{BG_INFO}{FG_BG}[INFO]{RESET}{FG_INFO} {filepath} removed (invalid image){RESET}")
         return False
 
-    return True
 
-
-# This function makes two action, write images or stock address for next time
-def get_page_actions(req, iteration_loop_position, args, args_url, urls_to_visit):
-    if args_url.lower().endswith(EXTENSION_FILE):
-        filename = args_url.split('/')[-1]
-        filepath = unique_filepath(args.p, filename)
+def download_image(url: str, save_dir: str):
+    if stop_event.is_set():
+        return
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
+        r = requests.get(url, headers=headers, stream=True, timeout=8)
+        r.raise_for_status()
+        filename = os.path.basename(urlparse(url).path) or "image"
+        if not filename.lower().endswith(EXTENSIONS):
+            # Try to guess extension from Content-Type
+            ct = r.headers.get('content-type', '').lower()
+            if 'jpeg' in ct or 'jpg' in ct:
+                filename += '.jpg'
+            elif 'png' in ct:
+                filename += '.png'
+            elif 'gif' in ct:
+                filename += '.gif'
+            elif 'bmp' in ct:
+                filename += '.bmp'
+            else:
+                return
+        filepath = unique_filepath(save_dir, filename)
+        with open(filepath, 'wb') as f:
+            for chunk in r.iter_content(8192):
+                if stop_event.is_set():
+                    break
+                f.write(chunk)
         if not stop_event.is_set():
-            with open(filepath, 'wb') as f:
-                for chunk in req.iter_content(1024):
-                    if not stop_event.is_set():
-                        f.write(chunk)
             image_validator(filepath)
-
-    elif iteration_loop_position == "first":
-        page = BeautifulSoup(req.content, 'lxml')
-
-        with lock_check_url:
-            urls_to_visit[args_url] = page
+    except Exception as e:
+        if not stop_event.is_set():
+            print(f"{BG_UNKNOWN}{FG_BG}[ERR]{RESET}{FG_UNKNOWN} {url} → {e}{RESET}")
 
 
-# This function concern a thread, get request and load images if URL target an image
-# First, there is a header to simulate a real browser
-# The warning handle line is here to manage error due to xml parsing
-# After there is the get request part and check error
-# After there is image load part or stocking address for the next time
-def get_page(iteration_loop_position, args, args_url, urls_to_visit):
+def extract_links(base_url: str, html: bytes) -> set:
+    links = set()
+    try:
+        soup = BeautifulSoup(html, 'lxml')
+        for tag, attr in TAGS.items():
+            for el in soup.find_all(tag):
+                val = el.get(attr)
+                if not val:
+                    continue
+                if attr == 'srcset':
+                    # srcset = "url1 1x, url2 2x, ..."
+                    parts = [p.strip().split()[0] for p in val.split(',') if p.strip()]
+                    for p in parts:
+                        abs_url = urljoin(base_url, p)
+                        if abs_url.startswith('http'):
+                            links.add(abs_url)
+                else:
+                    abs_url = urljoin(base_url, val)
+                    if abs_url.startswith('http'):
+                        links.add(abs_url)
+    except Exception:
+        pass
+    return links
+
+
+def fetch(url: str, save_dir: str, depth: int, max_depth: int, visited: set, to_visit: dict):
+    if stop_event.is_set() or url in visited:
+        return
+    with lock:
+        if url in visited:
+            return
+        visited.add(url)
 
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36'
-        }
-
+        headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
         warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+        r = requests.get(url, headers=headers, timeout=8, allow_redirects=True)
+        r.raise_for_status()
 
-        if not stop_event.is_set():
-            r = requests.get(args_url, headers=headers, stream=True, timeout=5)
-            r.raise_for_status()
-        else:
-            return 0
+        if is_image_url(url) or r.headers.get('content-type', '').startswith('image/'):
+            download_image(url, save_dir)
+            return
 
-        get_page_actions(r, iteration_loop_position, args, args_url, urls_to_visit)
-
-        return 0
-
+        # HTML page → extract links if depth allows
+        if depth < max_depth:
+            new_links = extract_links(url, r.content)
+            with lock:
+                for link in new_links:
+                    if link not in visited:
+                        to_visit[link] = depth + 1
     except requests.Timeout:
         if not stop_event.is_set():
-            print(f"{BG_TIMEOUT}{FG_BG_TIMEOUT}[Timeout]  {RESET_COLOR}{FG_TIMEOUT} {args_url}{BG_TIMEOUT} {RESET_COLOR}{FG_TIMEOUT}Impossible to achieve{RESET_COLOR}")
-        else:
-            pass
-
-    except requests.TooManyRedirects:
+            print(f"{BG_TIMEOUT}{FG_BG}[Timeout]{RESET}{FG_TIMEOUT} {url}{RESET}")
+    except requests.HTTPError as e:
         if not stop_event.is_set():
-            print(f"{BG_REDIRECT}{FG_BG_TIMEOUT}[Redirect]{RESET_COLOR}{FG_REDIRECT} {args_url}{BG_REDIRECT} {RESET_COLOR}{FG_REDIRECT}Too many redirects{RESET_COLOR}")
-        else:
-            pass
-
-    except requests.ConnectionError:
+            print(f"{BG_HTTP}{FG_BG}[HTTP {e.response.status_code}]{RESET}{FG_HTTP} {url}{RESET}")
+    except Exception as e:
         if not stop_event.is_set():
-            print(f"{BG_CONNEXION}{FG_BG_CONNEXION}[Connexion]{RESET_COLOR}{FG_CONNEXION} {args_url}{BG_CONNEXION} {RESET_COLOR}{FG_CONNEXION}Connexion error{RESET_COLOR}")
-        else:
-            pass
-
-    except requests.HTTPError as http_err:
-        if not stop_event.is_set():
-            print(f"{BG_HTTP}{FG_BG_HTTP}[HTTP {http_err.response.status_code}] {RESET_COLOR}{FG_HTTP} {http_err.response.url}{RESET_COLOR}")
-        else:
-            pass
-
-    except requests.RequestException as e:
-        if not stop_event.is_set():
-            print(f"{BG_UNKNOWN}{FG_BG_UNKNOWN}[Unknown]  {RESET_COLOR}{FG_UNKNOWN} {args_url}{BG_UNKNOWN} {RESET_COLOR}{FG_UNKNOWN}{e}{RESET_COLOR}")
-        else:
-            pass
-
-    with lock_check_url:
-        urls_to_visit[args_url] = None
-
-    return 1
+            print(f"{BG_UNKNOWN}{FG_BG}[ERR]{RESET}{FG_UNKNOWN} {url} → {e}{RESET}")
 
 
-# This function concern a thread, extract and built absolute URL to explore
-def url_extractor(args, base_url, page, visited_urls):
+def spider(args):
+    save_dir = args.p
+    os.makedirs(save_dir, exist_ok=True)
 
-    for key, value in BALISE_ELEMENT.items():
-        for url in page.find_all(key):
-            link = url.get(value)
-            if link:
-                absolute_url = urljoin(base_url,link)
-                if absolute_url.startswith("http"):
-                    with lock_check_url:
-                        visited_urls[absolute_url]
+    max_depth = args.l if args.r else 0
+    visited = set()
+    to_visit = {args.URL: 0}          # url → current depth
 
+    while to_visit and not stop_event.is_set():
+        # Snapshot to allow safe iteration
+        current = dict(to_visit)
+        to_visit.clear()
 
-# Join and clear threads
-def thread_cleaner(threads):
-
-    for t in threads:
-        t.join()
-
-    threads.clear()
-
-
-# This function send threads for get pages and images
-def thread_handler_get_page(position, urls_to_visit, args):
-
-    threads = []
-
-    with lock_check_url:
-        temp = urls_to_visit.copy()
-    for key, value in temp.items():
-        if not stop_event.is_set():
-            t = threading.Thread(target=get_page, args=(position, args, key, urls_to_visit))
-            threads.append(t)
+        threads = []
+        for url, depth in current.items():
+            if stop_event.is_set():
+                break
+            t = threading.Thread(target=fetch, args=(url, save_dir, depth, max_depth, visited, to_visit))
             t.start()
+            threads.append(t)
 
-    thread_cleaner(threads)
-
-    temp.clear()
-
-
-# This function send threads for build next URLs to get
-def thread_handler_url_extractor(urls_to_visit, visited_urls, args):
-
-    threads = []
-
-    for key, value in urls_to_visit.items():
-        if value is not None:
-            if not stop_event.is_set():
-                t = threading.Thread(target=url_extractor, args=(args, key, value, visited_urls))
-                threads.append(t)
-                t.start()
-        else:
-            visited_urls[key] = True
-
-    thread_cleaner(threads)
+        for t in threads:
+            t.join()
 
 
-# This function handle next URLs to get
-def next_url_handler(urls_to_visit, visited_urls):
+def parse_args():
+    parser = argparse.ArgumentParser(description="Spider - download images recursively")
+    parser.add_argument('URL', help="Starting URL")
+    parser.add_argument('-r', action='store_true', help="Recursive download")
+    parser.add_argument('-l', metavar='N', type=int, default=5, help="Maximum depth level (default: 5)")
+    parser.add_argument('-p', metavar='PATH', default='./data/', help="Path where files will be saved (default: ./data/)")
+    return parser.parse_args()
 
-    for key, value in urls_to_visit.items():
-        visited_urls[key] = True
-
-    urls_to_visit.clear()
-
-    for key, value in visited_urls.items():
-        if not value:
-            urls_to_visit[key] = None
-
-
-# It's the main function which handle all url with threads
-def page_visiter(args):
-
-    visited_urls = defaultdict(lambda: False)
-    urls_to_visit = {args.URL: None}
-
-    recursive_number = 1
-
-    if args.r == True:
-        recursive_number += args.l
-
-    for i in range(recursive_number):
-        thread_handler_get_page("first", urls_to_visit, args)
-
-        thread_handler_url_extractor(urls_to_visit, visited_urls, args)
-
-        next_url_handler(urls_to_visit, visited_urls)
-
-    thread_handler_get_page("last", urls_to_visit, args)
-
-    if stop_event.is_set():
-        return True
-
-
-# This function handle directory been, right and creation
-def directory_handler(args_path):
-
-    if Path(args_path).is_dir() and not os.access(args_path, os.R_OK | os.W_OK):
-        raise PermissionError(f"Directory right problem: '{args_path}'")
-
-    os.makedirs(args_path, exist_ok=True)
-        
 
 def main():
-
     try:
         args = parse_args()
-
-        directory_handler(args.p)
-
-        page_visiter(args)
-
-    except PermissionError as e:
-        print(f"{BG_PB}{FG_BG_PB}[ERROR]    {RESET_COLOR}{FG_PB} {e}{RESET_COLOR}")
-
+        if not args.URL.startswith(('http://', 'https://')):
+            print(f"{BG_PB}{FG_BG}[ERROR]{RESET}{FG_PB} URL must start with http:// or https://{RESET}")
+            sys.exit(1)
+        spider(args)
     except Exception as e:
-        print(f"{BG_PB}{FG_BG_PB}[ERROR]    {RESET_COLOR}{FG_PB} {e}{RESET_COLOR}")
-    
+        print(f"{BG_PB}{FG_BG}[ERROR]{RESET}{FG_PB} {e}{RESET}")
+
 
 if __name__ == "__main__":
     main()
