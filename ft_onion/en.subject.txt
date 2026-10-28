@@ -1,0 +1,63 @@
+Cybersecurity Piscine
+ft_onion
+
+Summary: Unleash the power of anonymity on the Internet.
+Version: 1.00
+
+Chapter I
+Introduction
+The goal of this project is to create a web page and make it accessible from the Tor network by creating a hidden service. The hidden service is a web service that hides
+on the Tor network.
+What is the Tor network?
+
+Chapter II
+Prologue
+The Silk Road stretched across the entire Asian continent, connecting China with Mongolia, Persia, India, the Middle East, Turkey, Europe, and Africa. Despite the name, it was
+not the valuable cloth that was primarily traded. Glass, leather, weapons or war machines
+traveled the world, expanding industrial discoveries, printing techniques, gunpowder or
+the compass.
+
+Chapter III
+Mandatory Part
+You must run a web server that shows a webpage on the Tor network.
+• The service must have a static web page: a single index.html file. The page will
+be accessible through a url of the type xxxxxxxxx.onion. The content displayed
+on the page is up to you.
+• Nginx will be used to configure the web server. No other server or framework is
+allowed.
+• Access to the static page via HTTP on port 80 must be enabled.
+• Access to the server via SSH on port 4242 must be enabled.
+• You should not open any ports or set any firewall rules.
+
+| Files to submit |
+|---------------------|
+| index.html |
+| nginx.conf |
+| sshd_config |
+| torrc |
+
+You can use anything you want in order to validate this project. It is noted that you
+should be careful not to go too far.
+However, you need to justify your choices and add what is needed to your repository.
+Whether it is a docker image or something else.
+
+If you choose to use a VM you don’t have to push it in your
+repository.
+
+Chapter IV
+Bonus Part
+You can enhance your project with the following features:
+
+• SSH fortification. It will be thoroughly tested during evaluation.
+• An interactive application, something more impressive than a static webpage.
+
+The bonus part will only be assessed if the mandatory part is
+PERFECT. Perfect means the mandatory part has been integrally done
+and works without malfunctioning. If you have not passed ALL the
+mandatory requirements, your bonus part will not be evaluated at all.
+
+Chapter V
+Submission and peer-evaluation
+Turn in your assignment in your Git repository as usual. Only the work inside your
+repository will be evaluated during the defense. Don’t hesitate to double check the
+names of your folders and files to ensure they are correct.

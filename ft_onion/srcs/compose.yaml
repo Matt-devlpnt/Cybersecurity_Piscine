@@ -1,0 +1,41 @@
+services:
+    web_server_nginx:
+        build:
+            context: ./requirements/web_server_nginx
+            dockerfile: Dockerfile
+        container_name: web_server_nginx
+        init: true
+        restart: always
+        hostname: web_server_nginx
+        working_dir: /etc
+        networks:
+            network:
+                ipv4_address: 172.20.0.2
+        secrets:
+            - source: pwd_sshuser
+
+    onion_service:
+        build:
+            context: ./requirements/onion_service
+            dockerfile: Dockerfile
+        depends_on:
+            - web_server_nginx
+        container_name: onion_service
+        init: true
+        restart: always
+        hostname: onion_service
+        working_dir: /etc/tor
+        networks:
+            network:
+                ipv4_address: 172.20.0.3
+
+networks:
+    network:
+      driver: bridge
+      ipam:
+          config:
+              - subnet: 172.20.0.0/24
+
+secrets:
+    pwd_sshuser:
+        file: ./requirements/web_server_nginx/secrets/ssh_password
