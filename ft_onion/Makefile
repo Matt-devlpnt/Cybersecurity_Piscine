@@ -4,7 +4,7 @@ VIOLET=\033[1;38;5;141m
 GREEN=\033[1;38;5;79m
 NC=\033[0m
 
-.PHONY: all help down up exec ps get_onion_url ssh_connect
+.PHONY: all help down up exec get_onion_url ssh_connect
 
 all: help
 
@@ -13,7 +13,6 @@ help:
 	@echo -e '    ${GREEN}down${NC}: Stop and remove web_server_nginx container'
 	@echo -e '    ${GREEN}up${NC}: Create and start web_server_nginx container'
 	@echo -e '    ${GREEN}exec${NC}: Enter in web_server_nginx container'
-	@echo -e '    ${GREEN}ps${NC}: List containers'
 	@echo -e '    ${GREEN}get_onion_url${NC}: Get url of website'
 	@echo -e '    ${GREEN}ssh_connect${NC}: ssh connexion to nginx container'
 
@@ -41,9 +40,6 @@ up: down
 
 exec:
 	@sudo docker exec -it web_server_nginx sh
-
-ps:
-	@sudo docker compose -f ./srcs/compose.yaml ps
 
 get_onion_url:
 	@sudo docker exec onion_service cat /var/lib/tor/hidden_service/hostname

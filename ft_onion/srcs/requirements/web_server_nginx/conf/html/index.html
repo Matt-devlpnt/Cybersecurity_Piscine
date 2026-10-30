@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <!-- Encodage et affichage -->
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <!-- Informations sur le site -->
+        <title>CHIFOUMI</title>
+        <meta name="description" content="Bienvenue sur mon site web qui met en scene le fameux jeu chifoumi.">
+        <meta name="author" content="Matthieu CORDES">
+
+        <!-- Favicon et icônes -->
+        <link rel="icon" href="/favicon/favicon.ico" sizes="any">
+        <link rel="icon" href="/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+        <link rel="apple-touch-icon" href="/favicon/apple-touch-icon.png">
+
+        <link rel="preload" as="font" type="font/woff2" crossorigin="anonymous" href="/fonts/FascinateInline-Regular/FascinateInline-Regular.woff2">
+
+        <!-- CSS -->
+        <link rel="stylesheet" href="/css/styles.css">
+
+        <!-- Préchargement facultatif d'une image importante -->
+        <link rel="preload" as="image" href="/images/ciseaux.svg">
+        <link rel="preload" as="image" href="/images/feuille.svg">
+        <link rel="preload" as="image" href="/images/pierre.svg">
+
+	<script src="/js/typeWriter.js" defer></script>
+
+        <!-- JavaScript : chargé après l'analyse du HTML -->
+    </head>
+    <body>
+        <!-- Contenu du site -->
+        <header>
+            <img loading="lazy" src="/images/ciseaux.svg" alt="logo SHIFUMI">
+            <h1 class="highlight">CHIFOUMI</h1>
+        </header>
+
+        <main>
+            <p id="text"></p>
+	    <div>
+                <img id="gameImage" src="/images/pierre.svg" alt="Pierre">
+		<button class="button_play">Lets's GO</button>
+            </div>
+        </main>
+
+        <footer>
+	    Made with &#10084;&#65039; by Matthieu CORDES
+        </footer>
+    </body>
+</html>

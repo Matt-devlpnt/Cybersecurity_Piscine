@@ -22,6 +22,11 @@ COPY --chmod=600 --chown=sshuser:sshuser ./secrets/id_ed25519.pub /home/sshuser/
 COPY --chmod=644 --chown=root:root ./conf/sshd_config /etc/ssh
 COPY --chmod=644 --chown=root:root ./conf/nginx.conf /etc/nginx
 COPY --chmod=600 --chown=root:root ./conf/supervisord.conf /etc/supervisord.conf
+COPY --chmod=755 --chown=root:root ./conf/html /usr/share/nginx/html
+
+RUN chown -R root:root /usr/share/nginx/html \
+    && find /usr/share/nginx/html -type d -exec chmod 755 {} \; \
+    && find /usr/share/nginx/html -type f -exec chmod 644 {} \;
 
 
 FROM conf AS prod
