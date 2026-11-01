@@ -21,6 +21,7 @@ COPY --chmod=440 --chown=root:root ./conf/sudoers /etc/sudoers.d
 COPY --chmod=600 --chown=sshuser:sshuser ./secrets/id_ed25519.pub /home/sshuser/.ssh/authorized_keys
 COPY --chmod=644 --chown=root:root ./conf/sshd_config /etc/ssh
 COPY --chmod=644 --chown=root:root ./conf/nginx.conf /etc/nginx
+COPY --chmod=644 --chown=root:root ./conf/default.conf /etc/nginx/conf.d
 COPY --chmod=600 --chown=root:root ./conf/supervisord.conf /etc/supervisord.conf
 COPY --chmod=755 --chown=root:root ./conf/html /usr/share/nginx/html
 
