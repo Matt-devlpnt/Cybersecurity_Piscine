@@ -1,0 +1,18 @@
+footer {
+    position: fixed;
+    bottom: 20rem;
+    right: 0.3rem;
+    font-size: 1rem;
+    text-align: right;
+    margin: 0rem;
+    transform: rotate(-90deg);
+    transform-origin: bottom right;
+    max-height: 4rem;
+}
+
+@media screen and (max-width: 1024px) {
+    footer {
+        position: static;
+        transform: rotate(0deg);
+    }
+}

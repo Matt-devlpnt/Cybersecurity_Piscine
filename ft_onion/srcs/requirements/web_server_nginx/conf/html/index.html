@@ -19,21 +19,27 @@
         <link rel="preload" as="font" type="font/woff2" href="/fonts/FascinateInline-Regular/FascinateInline-Regular.woff2" crossorigin>
 
         <!-- CSS -->
-        <link rel="stylesheet" href="/css/styles.css">
+        <link rel="stylesheet" href="/css/global.css">
+        <link rel="stylesheet" href="/css/header.css">
+        <link rel="stylesheet" href="/css/home.css">
+        <link rel="stylesheet" href="/css/footer.css">
 
         <!-- Préchargement facultatif d'une image importante -->
         <link rel="preload" as="image" href="/images/ciseaux.svg">
         <link rel="preload" as="image" href="/images/feuille.svg">
         <link rel="preload" as="image" href="/images/pierre.svg">
 
-	<script src="/js/typeWriter.js" defer></script>
+	<script src="/js/header.js" defer></script>
+	<script src="/js/home.js" defer></script>
 
         <!-- JavaScript : chargé après l'analyse du HTML -->
     </head>
     <body>
         <!-- Contenu du site -->
         <header>
-            <img loading="lazy" src="/images/ciseaux.svg" alt="logo SHIFUMI">
+	    <a href="index.html">
+                <img loading="lazy" src="/images/ciseaux.svg" alt="logo SHIFUMI">
+	    </a>
             <h1 class="highlight">CHIFOUMI</h1>
         </header>
 
