@@ -30,6 +30,7 @@
         <link rel="preload" as="image" href="/images/pierre.svg">
 
 	<script src="/js/header.js" defer></script>
+	<script src="/js/game.js" defer></script>
 
         <!-- JavaScript : chargé après l'analyse du HTML -->
     </head>
@@ -43,8 +44,19 @@
         </header>
 
         <main>
-	    <div>COUCOU</div>
-	    <div>BONJOUR</div>
+	    <div>
+	        <p>GUEST vs MACHINE</p><p class="score">SCORE</p>
+	    </div>
+	    <div id="chifoumi_roll">
+	    </div>
+	    <div>
+	        <div id="dropzone">
+		    <p id="drop_message">Dépose ton image ici</p>
+                </div>
+                <img id="pierre" src="/images/pierre.svg" alt="pierre">
+                <img id="feuille" src="/images/feuille.svg" alt="feuille">
+                <img id="ciseaux" src="/images/ciseaux.svg" alt="ciseaux">
+	    </div>
         </main>
 
         <footer>

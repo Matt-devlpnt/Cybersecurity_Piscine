@@ -1,20 +1,80 @@
 main {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-evenly;
-  gap: 20px;
-  margin: 20px 0px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+    gap: 20px;
+    margin: 20px 0px;
 }
 
 main > * {
-  width: 50%;
-  flex:  1 1 500px;
+    width: 50%;
+    flex:  1 1 500px;
+    text-align: center;
 }
 
-main :first-child {
-  background-color: orangered;
+main > :first-child {
+    flex: 1 1 100%;
+    background-color: lightblue;
 }
 
-main :nth-child(2) {
-  background-color: blueviolet;
+main > :nth-child(2) {
+    font-size: 19rem;
+    background-color: orangered;
+}
+
+main > :nth-child(3) {
+    background-color: blueviolet;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    grid-template-areas: 
+        "drop_zone drop_zone drop_zone"
+	"drag_zone_pierre drag_zone_feuille drag_zone_ciseaux";
+    justify-items: center;
+}
+
+main > :nth-child(3) div {
+    position: relative;
+    grid-row: 1;
+    grid-column: 1 / 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0dede;
+    width: 100%;
+    height: 100%;
+    border-radius: 5px;
+    color: #4b75ff;
+}
+
+main > :nth-child(3) div::after {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 0.5rem dotted red;
+    pointer-events: none;
+    margin: 0rem;
+}
+
+main > :nth-child(3) img {
+    rotate: -90deg;
+    width: 10rem;
+    align-self: end;
+}
+
+main > :nth-child(3) > :first-child {
+    grid-area: drop_zone;
+}
+
+main > :nth-child(3) > #pierre {
+    grid-area: drag_zone_pierre;
+}
+
+main > :nth-child(3) > #feuille {
+    grid-area: drag_zone_feuille;
+}
+
+main > :nth-child(3) > #ciseaux {
+    grid-area: drag_zone_ciseaux;
 }
