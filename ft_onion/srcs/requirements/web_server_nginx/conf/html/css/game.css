@@ -12,28 +12,41 @@ main > * {
     text-align: center;
 }
 
-main > :first-child {
-    flex: 1 1 100%;
-    background-color: lightblue;
+main > :nth-child(1) {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: 3fr 1fr;
+    grid-template-areas: 
+        "robot_zone robot_zone"
+	"round_zone score_zone";
+    gap: 20px;
+    align-items: center;
+    justify-content: center;
+    font-size: 19rem;
+    height: 75vh;
+}
+
+main > :nth-child(1) > * {
+    background-color: rgba(0, 0, 0, 0.2);
+    outline: 0.5rem solid #f0dede;
+    border-radius: 5px;
 }
 
 main > :nth-child(2) {
-    font-size: 19rem;
-    background-color: orangered;
-}
-
-main > :nth-child(3) {
-    background-color: blueviolet;
+    #background-color: blueviolet;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(2, 1fr);
+    grid-template-rows: 5fr 1fr;
     grid-template-areas: 
         "drop_zone drop_zone drop_zone"
 	"drag_zone_pierre drag_zone_feuille drag_zone_ciseaux";
+    gap: 20px;
     justify-items: center;
+    height: 75vh;
+    font-size: 2rem;
 }
 
-main > :nth-child(3) #dropzone {
+main > :nth-child(2) #dropzone {
     position: relative;
     grid-row: 1;
     grid-column: 1 / 4;
@@ -47,7 +60,7 @@ main > :nth-child(3) #dropzone {
     color: #4b75ff;
 }
 
-main > :nth-child(3) #dropzone::after {
+main > :nth-child(2) #dropzone::after {
     content: "";
     position: absolute;
     width: 100%;
@@ -83,4 +96,47 @@ main > :nth-child(3) #dropzone::after {
 
 #dropzone_ciseaux {
     grid-area: drag_zone_ciseaux;
+}
+
+#chifoumi_roll {
+    grid-area: robot_zone;
+    grid-row: 1 / 2;
+    grid-column: 1 / 3;
+    #font-size:3rem;
+    height:100%;
+}
+
+#chifoumi_roll img {
+    width:50%;
+    height:auto;
+}
+
+#round_zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    grid-area: round_zone;
+    grid-row: 2 / 3;
+    grid-column: 1 / 2;
+    height:100%;
+    font-size: 2rem;
+}
+
+#round_zone p {
+    margin: 0rem;
+}
+
+#score_zone {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    grid-area: score_zone;
+    grid-row: 2 / 3;
+    grid-column: 2 / 3;
+    height:100%;
+    font-size: 2rem;
+}
+
+#score_zone p {
+    margin: 0rem;
 }

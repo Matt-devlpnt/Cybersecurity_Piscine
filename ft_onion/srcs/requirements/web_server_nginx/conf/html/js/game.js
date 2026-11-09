@@ -1,26 +1,121 @@
-function chifoumi_roll() {
-    const target = document.querySelector("#chifoumi_roll");
+const target = document.querySelector("#chifoumi_roll");
 
-    const text_roll = [
-        "CHI",
-	"FOU",
-	"MI"
-    ];
-
-    let index = 0;
-
-    setInterval(() => {
-        index = (index + 1) % text_roll.length;
-
-	target.textContent = text_roll[index];
-    }, 1000);
+function chifoumi_roll(text) {
+    target.textContent = text;
 }
 
 
 
-window.addEventListener("load", () => {
-    setTimeout(chifoumi_roll, 1000);
-});
+function add_image(src, alt, id) {
+    image = document.createElement("img");
+    image.src = src;
+    image.alt = alt;
+    image.id = id;
+    target.textContent = "";
+    target.appendChild(image);
+}
+
+
+
+function robot_choice() {
+    const choice = ["pierre", "feuille", "ciseaux"];
+
+    const pull = choice[Math.floor(Math.random() * choice.length)];
+
+    if (pull === "pierre") {
+        add_image("/images/pierre_robot.svg", "pierre robot", "pierre_robot");
+    } else if (pull === "feuille") {
+        add_image("/images/feuille_robot.svg", "feuille robot", "feuille_robot");
+    } else {
+        add_image("/images/ciseaux_robot.svg", "ciseaux robot", "ciseaux_robot");
+    }
+
+    return pull;
+}
+
+
+
+let round_number = 1;
+let robot_score = 0;
+let user_score = 0;
+const round = document.getElementById("round_zone").querySelector("p");;
+const robot_scr = document.getElementById("score_zone").querySelector("#robot_score");
+const user_scr = document.getElementById("score_zone").querySelector("#user_score");
+
+function counter_handler(old_robot_score, old_user_score, robot_score, user_score) {
+    if (old_robot_score !== robot_score
+        || old_user_score !== user_score) {
+        round_number += 1;
+        round.textContent = "Round: " + round_number;
+    }
+}
+
+function score_handler(old_robot_score, old_user_score, robot_score, user_score) {
+    if (old_robot_score !== robot_score) {
+        robot_scr.textContent = "Robot: " + robot_score;
+    } else if (old_user_score !== user_score) {
+        user_scr.textContent = "Guest: "+ user_score;
+    }
+}
+
+function game_score(robot_choice, user_choice) {
+    let old_robot_score = robot_score;
+    let old_user_score = user_score;
+
+    if (robot_choice === "pierre") {
+        if (user_choice === "pierre") {
+            robot_score += 0;
+            user_score += 0;
+	} else if (user_choice === "feuille") {
+            robot_score += 0;
+            user_score += 1;
+	} else {
+            robot_score += 1;
+            user_score += 0;
+	}
+    } else if (robot_choice === "feuille") {
+        if (user_choice === "pierre") {
+            robot_score += 1;
+            user_score += 0;
+	} else if (user_choice === "feuille") {
+            robot_score += 0;
+            user_score += 0;
+	} else {
+            robot_score += 0;
+            user_score += 1;
+	}
+    } else {
+        if (user_choice === "pierre") {
+            robot_score += 0;
+            user_score += 1;
+	} else if (user_choice === "feuille") {
+            robot_score += 1;
+            user_score += 0;
+	} else {
+            robot_score += 0;
+            user_score += 0;
+	}
+    }
+
+    counter_handler(old_robot_score, old_user_score, robot_score, user_score);
+
+    score_handler(old_robot_score, old_user_score, robot_score, user_score);
+
+    if (robot_score === 3) {
+        target.textContent = "KO";
+    } else if (user_score === 3) {
+        target.textContent = "OK";
+    }
+    
+    if (robot_score === 3 || user_score === 3) {
+        robot_score = 0;
+        user_score = 0;
+        robot_scr.textContent = "Robot: 0";
+        user_scr.textContent = "Guest: 0";
+        round_number = 1;
+        round.textContent = "Round: " + round_number;
+    }
+}
 
 
 
@@ -142,6 +237,14 @@ dropzone.addEventListener("drop", (e) => {
     if (svg && svg.nodeName === "IMG")
         dropzone.appendChild(svg);
     dropzone.style.backgroundColor = "#f0dede";
+
+    chifoumi_roll("CHI");
+    setTimeout(() => {chifoumi_roll("FOU");}, 1000);
+    setTimeout(() => {chifoumi_roll("MI");}, 2000);
+    setTimeout(() => {
+        choice = robot_choice();
+        game_score(choice, dropzone.children[1].id);
+    }, 2500);
 });
 
 
