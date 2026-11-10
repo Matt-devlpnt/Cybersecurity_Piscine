@@ -1,15 +1,17 @@
 #include <stdio.h>
 #include <string.h>
 
-int main(void) {
+int main(void)
+{
     char password[100];
 
     printf("Please enter key: ");
-    scanf("%s", &password);
-    if (strcmp(password, "mot_de_passe") == 0) {
-    } else {
-        printf("Nope.");
-        return 0;
-    }
+    scanf("%99s", password);
+
+    if (strcmp(password, "__stack_check") == 0)
+        printf("Good job.\n");
+    else
+        printf("Nope.\n");
+
     return 0;
 }
