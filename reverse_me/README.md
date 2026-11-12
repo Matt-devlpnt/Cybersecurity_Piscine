@@ -1,5 +1,7 @@
-Functions view:
-    info functions
+Utils functions to solve this project:
 
-Code assembly view:
-    disassemble main
+- file level1
+- strings level1
+- nm -n ./level1
+- objdump -d -M intel level1
+- gdb ./level1
