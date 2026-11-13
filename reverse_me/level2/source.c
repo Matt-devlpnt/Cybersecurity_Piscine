@@ -25,15 +25,16 @@ int main(void) {
 
         int i = 2;
         int j = 1;
+        char temp[4];
+
+        temp[3] = '\0';
 
         while (strlen(buffer) < 8 && i < strlen(password)) {
-            char temp[4];
 
             // Récupération de trois caractères
             temp[0] = password[i];
             temp[1] = password[i + 1];
             temp[2] = password[i + 2];
-            temp[3] = '\0';
 
             // Conversion en entier
             int result = atoi(temp);

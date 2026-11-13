@@ -10,6 +10,16 @@ lev3:
 	gcc -m32 -O0 -fno-builtin-printf -fPIE -pie ./level3/source.c -o ./level3/source
 
 clean:
-	rm ./level1/source ./level2/source ./level3/source
+	@if [ -e ./level1/source ]; then \
+		rm ./level1/source; \
+	fi
+
+	@if [ -e ./level2/source ]; then \
+		rm ./level2/source; \
+	fi
+
+	@if [ -e ./level3/source ]; then \
+		rm ./level3/source; \
+	fi
 
 re: clean lev1 lev2 lev3
