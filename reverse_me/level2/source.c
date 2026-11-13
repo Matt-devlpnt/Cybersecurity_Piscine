@@ -7,9 +7,8 @@ void no( void ) {
     exit(EXIT_FAILURE);
 }
 
-int ok( void ) {
+void ok( void ) {
     puts("Good job.");
-    return EXIT_SUCCESS;
 }
 
 int main(void) {
@@ -20,16 +19,14 @@ int main(void) {
     int scan_return = scanf("%23s", password);
 
     if (scan_return == 1 && password[0] == '0' && password[1] == '0') {
+        fflush(stdin);
         memset(buffer, 0, 9);
         buffer[0] = 'd';
-
-        size_t length_buffer = strlen(buffer);
-        size_t length_password = strlen(password);
 
         int i = 2;
         int j = 1;
 
-        while (length_buffer < 8 && i < length_password) {
+        while (strlen(buffer) < 8 && i < strlen(password)) {
             char temp[4];
 
             // Récupération de trois caractères
@@ -59,6 +56,4 @@ int main(void) {
     } else {
         no();
     }
-
-    return EXIT_SUCCESS;
 }
