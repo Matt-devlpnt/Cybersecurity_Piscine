@@ -45,10 +45,37 @@ int main(void) {
 
         buffer[j] = '\0';
 
-        if (strcmp(buffer, "********") == 0)
-            ____syscall_malloc();
-        else
-            ___syscall_malloc();
+        switch (strcmp(buffer, "********")) {
+            case -2:
+                ___syscall_malloc();
+                break;
+            case -1:
+                ___syscall_malloc();
+                break;
+            case 0:
+                ____syscall_malloc();
+                break;
+            case 1:
+                ___syscall_malloc();
+                break;
+            case 2:
+                ___syscall_malloc();
+                break;
+            case 3:
+                ___syscall_malloc();
+                break;
+            case 4:
+                ___syscall_malloc();
+                break;
+            case 5:
+                ___syscall_malloc();
+                break;
+            case 115:
+                ___syscall_malloc();
+                break;
+            default:
+                ___syscall_malloc();
+        }
 
     } else {
         ___syscall_malloc();
