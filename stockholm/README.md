@@ -6,9 +6,9 @@ The project uses Fernet, provided by the Python cryptography library, to perform
 
 The choice of Fernet is based on the following properties:
 
-    Security: It relies on AES-128 in CBC mode combined with HMAC-SHA256 to provide confidentiality and data integrity.
-    Authentication: It verifies that encrypted data has not been modified before allowing decryption.
-    Simplicity: It provides a high-level API that handles cryptographic operations internally, reducing the risk of implementation errors.
+- Security: It relies on AES-128 in CBC mode combined with HMAC-SHA256 to provide confidentiality and data integrity.
+- Authentication: It verifies that encrypted data has not been modified before allowing decryption.
+- Simplicity: It provides a high-level API that handles cryptographic operations internally, reducing the risk of implementation errors.
 
 This project demonstrates how symmetric encryption works, how cryptographic keys are generated and managed, and why protecting the encryption key is essential for data recovery.
 
