@@ -12,7 +12,7 @@ NON_INFECT_EXTENSION_0 := .ooo
 NON_INFECT_EXTENSION_1 := .ft
 
 
-.PHONY: help infection_folder
+.PHONY: help infection_folder run clean_infection_folder
 
 all: help
 
@@ -20,7 +20,7 @@ help:
 	@echo -e '${VIOLET}You can use these followings command:${NC}'
 	@echo -e '    ${GREEN}infection_folder${NC}: Create infection folder in home folder of user.'
 	@echo -e '    ${GREEN}clean_infection_folder${NC}: Remove infection folder in home folder of user.'
-	@echo -e '    ${GREEN}run${NC}: Run softwear without any options.'
+	@echo -e '    ${GREEN}run${NC}: Run software without any options.'
 
 infection_folder:
 	@if [ ! -d $(HOME_DIR)/$(INFECTION_FOLDER) ]; then \
