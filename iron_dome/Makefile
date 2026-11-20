@@ -4,8 +4,7 @@ VIOLET=\033[1;38;5;141m
 GREEN=\033[1;38;5;79m
 NC=\033[0m
 
-LOG_DIR := /var/log/irondome
-LOG_FILE := irondome.log 
+PYTHON = venv/bin/python
 
 
 .PHONY: help run
@@ -18,7 +17,7 @@ help:
 	@echo -e '    ${GREEN}clean${NC}: Remove /var/log/irondome folder'
 
 run:
-	sudo python3 src/irondome $(PATHS)
+	sudo $(PYTHON) -m src.irondome $(PATHS)
 
 clean:
 	sudo rm -rf /var/log/irondome

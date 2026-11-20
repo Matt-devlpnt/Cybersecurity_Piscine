@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from utils import permissions, system
+from .utils import permissions, system
 
 permissions.user_root_checker()
 system.system_checker()
@@ -11,14 +11,22 @@ system.system_checker()
 
 import sys
 import argparse
+import traceback
 from pathlib import Path
-from logger.logger import logger
+from .daemon.daemon import coucou, stop
+from .logger.logger import setup_logger
+
+import daemon
+import signal
+from daemon.pidfile import TimeoutPIDLockFile
 
 ####################
 # Globale variable #
 ####################
 
 DEFAULT_FILES_AND_FOLDERS = ['/var/log', '/etc']
+LOG_DIR = Path("/var/log/irondome")
+LOG_FILE = LOG_DIR / "irondome.log"
 
 ###########
 # Program #
@@ -55,12 +63,48 @@ def main():
     try:
         args = parse_args()
 
-        logger.error("C est une erreur")
-
     except PermissionError as e:
         print(e, file=sys.stderr)
     except Exception as e:
         print(e, file=sys.stderr)
 
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE.touch(mode=644, exist_ok=True)
+log_file = open(LOG_FILE, 'r', encoding='utf-8')
+pid_log_file = log_file.fileno()
+
+def start_daemon():
+    try:
+        irondome_daemon = daemon.DaemonContext(
+            chroot_directory=None,
+            working_directory='/',
+            umask=0o077,
+            uid=0,
+            gid=0,
+            initgroups=False,
+            prevent_core=True,
+            detach_process=True,
+            files_preserve=[pid_log_file],
+            pidfile=TimeoutPIDLockFile(
+                "/run/irondome.pid",
+                acquire_timeout=0
+            ),
+            stdin=None,
+            stdout=None,
+            stderr=None,
+            signal_map=None
+        )
+
+        with irondome_daemon:
+            logger = setup_logger()
+            signal.signal(signal.SIGTERM, stop)
+            signal.signal(signal.SIGINT, stop)
+            coucou()
+
+        #log_file.close()
+
+    except Exception as e:
+        traceback.print_exc()
+
 if __name__ == '__main__':
-    main()
+    start_daemon()
