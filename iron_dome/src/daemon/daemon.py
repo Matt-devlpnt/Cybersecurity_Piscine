@@ -2,22 +2,14 @@
 
 import time
 import signal
-from ..logger.logger import logger, shutdown_logger
+from ..logger.logger import logger
 
 
 running = True
 
 def stop(signum, frame):
-    if signum == signal.SIGTERM:
-        logger.error(f'SIGTERMSIGTERM')
-    if signum == signal.SIGINT:
-        logger.error(f'SIGINTSIGINT')
-    logger.info(f'signum:{signum}')
-    logger.info(f'frame:{frame}')
-    logger.error(f'SALUT')
+    global running
     running = False
-    shutdown_logger()
-    exit(0)
 
 def coucou():
     while running:

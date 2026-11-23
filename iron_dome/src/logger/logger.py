@@ -46,7 +46,7 @@ def setup_logger():
 
 
 def shutdown_logger():
-    logger.error(f'SHUTDOWN_LOGGER')
+    logger.info("Shutdown logger")
 
     for handler in logger.handlers[:]:
         handler.flush()
