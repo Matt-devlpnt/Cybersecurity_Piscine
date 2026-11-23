@@ -11,13 +11,14 @@ system.system_checker()
 
 import sys
 import argparse
-from pathlib import Path
-from .daemon.daemon import coucou, stop
-from .logger.logger import setup_logger, shutdown_logger
-
 import daemon
 import signal
+from pathlib import Path
 from daemon.pidfile import TimeoutPIDLockFile
+
+from .monitors.file_monitor import files_folders_observer
+from .logger.logger import setup_logger, shutdown_logger
+from .signal.handler import stop
 
 ####################
 # Globale variable #
@@ -93,7 +94,7 @@ def start_daemon():
             signal.signal(signal.SIGTERM, stop)
             signal.signal(signal.SIGINT, stop)
 
-            coucou()
+            files_folders_observer()
 
         except Exception as e:
             logger.error(e)
