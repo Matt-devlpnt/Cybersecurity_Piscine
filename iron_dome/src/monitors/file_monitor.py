@@ -6,6 +6,7 @@
 # Import #
 ##########
 
+from pathlib import Path
 from watchdog import events
 from watchdog.observers import Observer
 
@@ -42,10 +43,17 @@ class MyEventHandler(events.FileSystemEventHandler):
         logger.info("Closed no write: %s", event)
 
 
-def files_folders_observer():
+def files_folders_observer(paths: list[Path]):
+
     event_handler = MyEventHandler()
     observer = Observer()
-    observer.schedule(event_handler, "/home/mcordes/Desktop/Cybersecurity_Piscine/iron_dome/src", recursive=True)
+
+    for path in paths:
+        if path.is_dir():
+            observer.schedule(event_handler, path, recursive=True)
+        elif path.is_file():
+            observer.schedule(event_handler, path, recursive=False)
+
     observer.start()
 
     try:

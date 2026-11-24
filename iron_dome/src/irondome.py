@@ -24,7 +24,16 @@ from .signal.handler import stop
 # Globale variable #
 ####################
 
-DEFAULT_FILES_AND_FOLDERS = ['/var/log', '/etc']
+DEFAULT_FILES_AND_FOLDERS = [
+    "/home",
+    "/root",
+    "/etc",
+    "/boot",
+    "/var/www",
+    "/usr/local/bin",
+    "/usr/local/sbin"
+]
+
 LOG_DIR = Path("/var/log/irondome")
 LOG_FILE = LOG_DIR / "irondome.log"
 
@@ -36,6 +45,29 @@ pid_log_file = log_file.fileno()
 ###########
 # Program #
 ###########
+
+def normalize_paths(paths: list[str]) -> list[Path]:
+    normalized = set()
+
+    for path in paths:
+        try:
+            resolved_path = Path(path).resolve(strict=True)
+
+            if not resolved_path.exists():
+                continue
+
+            normalized.add(resolved_path)
+        except (OSError, RuntimeError) as e:
+            print(e, file=sys.stderr)
+
+    result = []
+
+    for path in sorted(normalized, key=lambda p: len(p.parts)):
+        if not any(parent in path.parents for parent in result):
+            result.append(path)
+
+    return result
+
 
 def check_path(path: str) -> Path:
     path_name = Path(path)
@@ -51,20 +83,22 @@ def check_path(path: str) -> Path:
     return path_name
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args() -> list[Path]:
     parser = argparse.ArgumentParser(description='irondome - tool that detect anomalous activity by monitoring different operating system parameters ', prog='irondome')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.0')
-    parser.add_argument('paths', nargs='*', type=check_path, default=DEFAULT_FILES_AND_FOLDERS, help='list of files and folders')
+    parser.add_argument('paths', nargs='*', type=check_path, help='list of files and folders')
 
     args = parser.parse_args()
 
     args.paths = [path for path in args.paths if path is not None]
 
     if (len(args.paths) == 0):
-        args.paths = DEFAULT_FILES_AND_FOLDERS
+        args.paths = [path for path in DEFAULT_FILES_AND_FOLDERS if check_path(path) is not None]
+
+    return normalize_paths(args.paths)
 
 
-def start_daemon():
+def start_daemon(paths: list[Path]) -> None:
     irondome_daemon = daemon.DaemonContext(
         chroot_directory=None,
         working_directory='/',
@@ -94,7 +128,7 @@ def start_daemon():
             signal.signal(signal.SIGTERM, stop)
             signal.signal(signal.SIGINT, stop)
 
-            files_folders_observer()
+            files_folders_observer(paths)
 
         except Exception as e:
             logger.error(e)
@@ -107,14 +141,14 @@ def start_daemon():
 
 def main():
     try:
-        args = parse_args()
+        paths = parse_args()
 
     except PermissionError as e:
         print(e, file=sys.stderr)
     except Exception as e:
         print(e, file=sys.stderr)
 
-    start_daemon()
+    start_daemon(paths)
 
 
 if __name__ == '__main__':
