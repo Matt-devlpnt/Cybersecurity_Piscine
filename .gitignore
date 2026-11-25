@@ -9,3 +9,6 @@ venv/
 # IDE
 .idea/
 .vscode/
+
+#doc
+iron_dome/doc/

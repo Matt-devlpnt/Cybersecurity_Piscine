@@ -4,11 +4,11 @@
 # Import #
 ##########
 
-from . import state
+from . import signal_state
 
 ###########
 # Program #
 ###########
 
 def stop(signum, frame):
-    state.shutdown_event.set()
+    signal_state.shutdown_event.set()
